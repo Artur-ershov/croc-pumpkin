@@ -53,9 +53,20 @@
 
   // ── Layout: scale the 1920×1080 stage, or reflow on phones ──────────────────
   function layout() {
-    const mobile = innerWidth < 760 || innerWidth / innerHeight < 0.75;
+    // Portrait screens and short landscape phones get the stacked layout;
+    // the 1920×1080 stage there would scale text down to ~10px.
+    const mobile = innerWidth < 760 || innerWidth < innerHeight || innerHeight < 500;
+    document.documentElement.classList.toggle("mobile", mobile);
     document.body.classList.toggle("mobile", mobile);
-    if (mobile) { stage.style.transform = ""; fitAll(); return; }
+    if (mobile) {
+      stage.style.transform = "";
+      // Tablets: enlarge the phone layout instead of leaving it tiny on a wide screen.
+      const z = innerHeight >= 600 ? Math.min(Math.max(innerWidth / 540, 1), 1.6) : 1;
+      stage.style.zoom = z === 1 ? "" : String(z);
+      fitAll();
+      return;
+    }
+    stage.style.zoom = "";
     const s = Math.min(innerWidth / 1920, innerHeight / 1080);
     stage.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
     fitAll();
@@ -179,6 +190,9 @@
       b.classList.toggle("is-active", i === current);
       b.classList.toggle("is-done", !!answers[i]);
     });
+    // phones: the tab strip scrolls sideways, keep the active tab in view
+    const activeTab = tabs.children[current];
+    if (tabs.scrollWidth > tabs.clientWidth) tabs.scrollTo({ left: activeTab.offsetLeft - 20, behavior: "smooth" });
     const word = $("#scenario-word");
     word.textContent = s.word;
     $("#scenario-text").textContent = s.text;
@@ -231,6 +245,8 @@
     if (next === -1) { setTimeout(finish, 300); return; }
     if (!wasDone) current = next;
     renderGame(wasDone ? -1 : doneCount() - 1);
+    // on phones the new scenario word is above the fold after typing
+    if (!wasDone && document.body.classList.contains("mobile")) scrollTo({ top: 0, behavior: "smooth" });
   });
   answer.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("#answer-form").requestSubmit();

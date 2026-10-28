@@ -274,10 +274,10 @@ html, body {
 .modal-help.error::before { content: "! "; font-variation-settings: "wdth" 100, "wght" 900; }
 
 /* ── Mobile: reflow instead of scaling ── */
-body.mobile { overflow: auto; }
+html.mobile, body.mobile { overflow: visible; height: auto; }
 body.mobile .viewport { position: static; overflow: visible; }
 body.mobile .stage { position: relative; width: 100%; height: auto; min-height: 100vh; transform: none !important; background-attachment: fixed; }
-body.mobile .screen { position: relative; display: none; padding: 20px 20px 40px; }
+body.mobile .screen { position: relative; display: none; padding: 20px 20px 40px; max-width: 640px; margin: 0 auto; }
 body.mobile .screen.is-active { display: flex; flex-direction: column; gap: 18px; }
 body.mobile .screen > * { position: relative; left: auto; right: auto; top: auto; width: auto; height: auto; transform: none; }
 body.mobile .screen-start .mega { order: 1; }
@@ -286,7 +286,7 @@ body.mobile .screen-start .pumpkin { order: 3; }
 body.mobile .screen-start .col-left { order: 4; }
 body.mobile .screen-start .col-right { order: 5; }
 body.mobile .screen-start .btn-start { order: 6; }
-body.mobile .head { gap: 12px; margin: -16px 0 -20px; }
+body.mobile .head { gap: 12px; margin: -16px 0 -20px; order: -2; }
 body.mobile .logo-croc { font-size: 20px; }
 body.mobile .logo-hw { width: 150px; height: 55px; }
 body.mobile .mega { font-size: 60px; line-height: .85; }
@@ -311,10 +311,10 @@ body.mobile .answer { flex-direction: column; height: auto; }
 body.mobile .answer textarea { font-size: 17px; padding: 16px 18px; border-radius: 20px; min-height: 140px; }
 body.mobile .reward-num { font-size: 76px; }
 body.mobile .muted { font-size: 16px !important; }
-body.mobile .modal { position: fixed; align-items: end; }
+body.mobile .modal { position: fixed; align-items: end; grid-template-columns: minmax(0, 1fr); }
 body.mobile .modal-card { width: 100%; border-radius: 28px 28px 0 0; padding: 28px 20px 34px; gap: 18px; }
 body.mobile .modal-title b { font-size: 48px; }
-body.mobile .modal-title span { font-size: 24px; }
+body.mobile .modal-title span { font-size: 24px; white-space: normal; }
 body.mobile .email-field { padding-left: 22px; }
 body.mobile .email-field input { font-size: 18px; }
 body.mobile .btn-round { width: 52px; height: 52px; }
