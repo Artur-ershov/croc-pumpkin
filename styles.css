@@ -360,7 +360,8 @@ body.mobile .modal-help { font-size: 14px; }
 .screen-game.swap .hint:not([hidden]) { animation: enter .45s .2s cubic-bezier(.2, .7, .2, 1) both; }
 .screen-game.swap .pumpkin-game :is(img, canvas) { animation: pumpkin-in .5s cubic-bezier(.3, 1.4, .5, 1) both; }
 .screen-game.swap #answer { animation: field-in .45s .15s ease both; }
-@keyframes word-in { from { clip-path: inset(0 100% 0 0); opacity: .3; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+/* negative insets leave room for descenders (Д, Щ) and the stroke outside the line box */
+@keyframes word-in { from { clip-path: inset(-40% 100% -40% -5%); opacity: .3; } to { clip-path: inset(-40% -5% -40% -5%); opacity: 1; } }
 @keyframes pumpkin-in { from { opacity: 0; transform: scale(.85) rotate(-6deg); } }
 @keyframes field-in { from { box-shadow: 0 0 0 6px rgba(0, 197, 115, .35); } }
 /* Press feedback */
