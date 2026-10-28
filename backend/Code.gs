@@ -1,57 +1,79 @@
 // Приём ответов игры «Заколдованная тыква».
 // Таблица → Расширения → Apps Script → вставить этот файл → Развернуть → Новое развертывание →
 // тип «Веб-приложение», запуск от моего имени, доступ «Все». Полученный URL — в BACKEND_URL в app.js.
+//
+// Under a burst of players the account allows 30 simultaneous executions, so doPost only appends one
+// row and holds the lock for a fraction of a second. "По участникам" is rebuilt on demand from the menu.
 
 const SCENARIOS = ["СПРОСИТЬ", "НАПОМНИТЬ", "ПОБЛАГОДАРИТЬ", "НЕ СОГЛАСИТЬСЯ"];
 const LOG_SHEET = "Все ответы";
+const LOG_HEADER = ["Время", "Почта", "Сценарий", "Ответ"];
 const PEOPLE_SHEET = "По участникам";
+const EMAIL_RE = /^[a-z0-9._%+-]+@croc\.ru$/;
 
 function doPost(e) {
+  let data;
+  try { data = JSON.parse(e.postData.contents); } catch (err) { return json({ ok: false, error: "bad request" }); }
+  const email = String(data.email || "").trim().toLowerCase();
+  const scenario = String(data.scenario || "");
+  const answer = String(data.answer || "");
+  if (!EMAIL_RE.test(email) || SCENARIOS.indexOf(scenario) === -1 || !answer) {
+    return json({ ok: false, error: "bad request" });
+  }
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(25000)) return json({ ok: false, error: "busy" }); // the game retries later
   try {
-    const data = JSON.parse(e.postData.contents);
-    const email = String(data.email || "").trim().toLowerCase();
-    const scenario = String(data.scenario || "");
-    const answer = String(data.answer || "");
-    if (!/^[a-z0-9._%+-]+@croc\.ru$/.test(email) || SCENARIOS.indexOf(scenario) === -1 || !answer) {
-      return json({ ok: false, error: "bad request" });
-    }
-    const now = new Date();
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Every submission, including re-answers.
-    sheet(ss, LOG_SHEET, ["Время", "Почта", "Сценарий", "Ответ"]).appendRow([now, email, scenario, answer]);
-
-    // One row per player with the latest answer to each scenario.
-    const people = sheet(ss, PEOPLE_SHEET, ["Почта"].concat(SCENARIOS, ["Пройдено", "Обновлено"]));
-    const emails = people.getRange(1, 1, people.getLastRow(), 1).getValues().map((r) => r[0]);
-    let row = emails.indexOf(email) + 1;
-    if (row === 0) {
-      people.appendRow([email]);
-      row = people.getLastRow();
-    }
-    people.getRange(row, 2 + SCENARIOS.indexOf(scenario)).setValue(answer);
-    const filled = people.getRange(row, 2, 1, SCENARIOS.length).getValues()[0].filter(String).length;
-    people.getRange(row, 2 + SCENARIOS.length, 1, 2).setValues([[filled + "/" + SCENARIOS.length, now]]);
-
-    return json({ ok: true });
+    sheet(SpreadsheetApp.getActiveSpreadsheet(), LOG_SHEET, LOG_HEADER).appendRow([new Date(), email, scenario, answer]);
+    SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
+  return json({ ok: true });
 }
 
 // GET ?email=… → indices of scenarios this player has answered, so the game resumes in any browser.
 // Answer texts are never returned.
 function doGet(e) {
   const email = String((e.parameter && e.parameter.email) || "").trim().toLowerCase();
-  if (!/^[a-z0-9._%+-]+@croc\.ru$/.test(email)) return json({ ok: false, error: "bad request" });
-  const people = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PEOPLE_SHEET);
-  if (!people || people.getLastRow() < 2) return json({ ok: true, done: [] });
-  const rows = people.getRange(2, 1, people.getLastRow() - 1, 1 + SCENARIOS.length).getValues();
-  const row = rows.find((r) => String(r[0]).toLowerCase() === email);
-  const done = row ? SCENARIOS.map((_, i) => i).filter((i) => String(row[1 + i]) !== "") : [];
-  return json({ ok: true, done: done });
+  if (!EMAIL_RE.test(email)) return json({ ok: false, error: "bad request" });
+  const log = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
+  if (!log || log.getLastRow() < 2) return json({ ok: true, done: [] });
+  const rows = log.getRange(2, 2, log.getLastRow() - 1, 2).getValues(); // Почта, Сценарий
+  const done = {};
+  rows.forEach((r) => { if (String(r[0]).toLowerCase() === email) done[SCENARIOS.indexOf(String(r[1]))] = true; });
+  return json({ ok: true, done: Object.keys(done).map(Number).filter((i) => i >= 0).sort() });
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu("Тыква").addItem("Обновить «По участникам»", "buildPeople").addToUi();
+}
+
+// One row per player with the latest answer to each scenario, built from the log.
+function buildPeople() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const log = sheet(ss, LOG_SHEET, LOG_HEADER);
+  const rows = log.getLastRow() < 2 ? [] : log.getRange(2, 1, log.getLastRow() - 1, 4).getValues();
+  const people = {};
+  const order = [];
+  rows.forEach((r) => {
+    const email = String(r[1]).toLowerCase();
+    const i = SCENARIOS.indexOf(String(r[2]));
+    if (!email || i === -1) return;
+    if (!people[email]) { people[email] = { answers: SCENARIOS.map(() => ""), updated: r[0] }; order.push(email); }
+    people[email].answers[i] = r[3];
+    people[email].updated = r[0];
+  });
+  const header = ["Почта"].concat(SCENARIOS, ["Пройдено", "Обновлено"]);
+  const out = [header].concat(order.map((email) => {
+    const p = people[email];
+    const filled = p.answers.filter(String).length;
+    return [email].concat(p.answers, [filled + "/" + SCENARIOS.length, p.updated]);
+  }));
+  const sh = ss.getSheetByName(PEOPLE_SHEET) || ss.insertSheet(PEOPLE_SHEET);
+  sh.clearContents();
+  sh.getRange(1, 1, out.length, header.length).setValues(out);
+  sh.setFrozenRows(1);
+  sh.getRange(1, 1, 1, header.length).setFontWeight("bold");
 }
 
 function sheet(ss, name, header) {
