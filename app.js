@@ -33,7 +33,11 @@
     disagree: { image: "assets/pumpkin-disagree.png" },
   };
 
-  const EMAIL_RE = /^[a-z0-9._%+-]+@croc\.ru$/i;
+  // Same rule as «Растопи лёд»: any domain, one "@", non-empty parts, login not all digits.
+  function isValidEmail(value) {
+    const parts = value.toLowerCase().split("@");
+    return parts.length === 2 && parts[0] !== "" && parts[1] !== "" && !/^\d+$/.test(parts[0]);
+  }
   const STORE_KEY = "croc-pumpkin-v1";
   const QUEUE_KEY = "croc-pumpkin-outbox";
   // Apps Script web app URL (see backend/Code.gs). Empty = answers stay in the browser only.
@@ -134,7 +138,7 @@
 
   function validateEmail(showError) {
     const v = emailInput.value.trim();
-    const ok = EMAIL_RE.test(v);
+    const ok = isValidEmail(v);
     emailBtn.disabled = !ok;
     const err = showError && v !== "" && !ok;
     emailField.classList.toggle("invalid", err);
