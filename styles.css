@@ -269,6 +269,17 @@ html, body {
 .btn-round svg { width: 40px; height: 40px; fill: none; stroke: var(--dark); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .btn-round:disabled { opacity: .4; cursor: default; }
 .btn-round:not(:disabled):hover { transform: translateX(3px); }
+/* waiting for the sheet to tell which scenarios are done */
+.email-field.is-loading { animation: field-pulse 1.2s ease-in-out infinite; }
+.email-field.is-loading .btn-round { opacity: 1; }
+.email-field.is-loading .btn-round svg { display: none; }
+.email-field.is-loading .btn-round::after {
+  content: ""; width: 40px; height: 40px; border-radius: 50%;
+  border: 4px solid rgba(0, 7, 6, .25); border-top-color: var(--dark);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes field-pulse { 50% { box-shadow: 0 0 0 6px rgba(0, 197, 115, .3); } }
 .modal-help { font-size: 24px; color: rgba(255, 244, 233, .7); }
 .modal-help.error { color: var(--orange); }
 .modal-help.error::before { content: "! "; font-variation-settings: "wdth" 100, "wght" 900; }
@@ -319,4 +330,5 @@ body.mobile .email-field { padding-left: 22px; }
 body.mobile .email-field input { font-size: 18px; }
 body.mobile .btn-round { width: 52px; height: 52px; }
 body.mobile .btn-round svg { width: 24px; height: 24px; }
+body.mobile .email-field.is-loading .btn-round::after { width: 24px; height: 24px; border-width: 3px; }
 body.mobile .modal-help { font-size: 14px; }

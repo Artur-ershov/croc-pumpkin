@@ -164,7 +164,9 @@
     email = emailInput.value.trim().toLowerCase();
     answers = (store[email] && store[email].answers) || {};
     checkingEmail = true; emailBtn.disabled = true;
+    emailField.classList.add("is-loading"); emailInput.readOnly = true;
     remoteDone = await fetchRemoteDone(email);
+    emailField.classList.remove("is-loading"); emailInput.readOnly = false;
     checkingEmail = false; emailBtn.disabled = false;
     modal.hidden = true;
     current = firstUndone();
