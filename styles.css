@@ -37,7 +37,7 @@ html, body {
 }
 
 /* ── Stage: 1920×1080 design scaled to the window ── */
-.viewport { position: fixed; inset: 0; overflow: hidden; background: var(--dark) url("assets/bg.png") repeat; }
+.viewport { position: fixed; inset: 0; overflow: hidden; overflow: clip; /* clip: the browser can't scroll it to a focused field either */ background: var(--dark) url("assets/bg.png") repeat; }
 .stage {
   position: absolute; left: 0; top: 0;
   width: 1920px; height: 1080px;
@@ -130,6 +130,14 @@ html, body {
   color: var(--green); text-decoration: none; font-size: 24px;
 }
 .link-memo:hover { text-decoration: underline; }
+.btn-memo {
+  align-self: flex-start; padding: 14px 28px; border-radius: 999px;
+  border: 2px solid var(--green); color: var(--cream); text-decoration: none; font-size: 24px;
+  font-variation-settings: "wdth" 100, "wght" 500;
+  transition: background .2s, color .2s, transform .15s;
+}
+@media (hover: hover) { .btn-memo:hover { background: var(--green); color: var(--dark); } }
+.btn-memo:active { transform: scale(.97); }
 .screen-start .col-left { width: 406px; }
 .screen-start .col-right { left: 1458px; top: 592px; width: 320px; }
 
@@ -313,6 +321,7 @@ body.mobile .bat, body.mobile .sticker { display: none; }
 body.mobile .col { gap: 16px; }
 body.mobile .col p { font-size: 16px; }
 body.mobile .link-memo { font-size: 15px; width: auto; }
+body.mobile .btn-memo { font-size: 16px; padding: 12px 20px; align-self: stretch; text-align: center; }
 body.mobile .btn-cta { font-size: 28px; padding: 20px; border-radius: 20px; width: 100%; }
 body.mobile .star { width: 22px; height: 22px; }
 body.mobile .tabs { justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; margin: 0 -20px; padding-left: 20px; }

@@ -134,6 +134,7 @@
   function show(id) {
     document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
     replay(document.getElementById(id), "entering", 1500);
+    viewport.scrollTop = 0;
     requestAnimationFrame(fitAll);
     if (document.body.classList.contains("mobile")) scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -202,10 +203,6 @@
       return new Set(); // offline or old script version: fall back to this browser's progress
     }
   }
-  $("#memo-link").addEventListener("click", (e) => {
-    e.preventDefault();
-    // TODO: ссылка на памятку по коммуникациям
-  });
 
   // ── 03: scenarios ───────────────────────────────────────────────────────────
   const tabs = $("#tabs");
