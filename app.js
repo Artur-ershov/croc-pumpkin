@@ -195,24 +195,12 @@
     if (FILM.flicker > 0) filters.push(`brightness(${(1 + rnd(FILM.flicker * FLICKER)).toFixed(3)})`);
     cv.style.filter = filters.join(" ") || "none";
   }
-  // The stage texture gets the same film treatment, softer: a slight shake and flicker on the same steps.
-  const BG_SHIFT = 2;      // px at full strength
-  const BG_FLICKER = 0.07; // brightness swing at full strength
-  const filmBg = document.createElement("div");
-  filmBg.className = "film-bg";
-  stage.prepend(filmBg);
-  function filmBackground() {
-    const rnd = (a) => (Math.random() * 2 - 1) * a;
-    filmBg.style.transform = FILM.shake > 0 ? `translate(${rnd(BG_SHIFT).toFixed(1)}px, ${rnd(BG_SHIFT).toFixed(1)}px)` : "";
-    filmBg.style.filter = FILM.flicker > 0 ? `brightness(${(1 + rnd(BG_FLICKER)).toFixed(3)})` : "";
-  }
   let filmNext = 0;
   (function filmLoop(t) {
     if (t >= filmNext) {
       const step = 1000 / FILM.fps;
       filmNext = t - filmNext > step ? t + step : filmNext + step; // keep the rate exact, resync after a stall
       document.querySelectorAll(".screen.is-active [data-pumpkin]").forEach(filmFrame);
-      filmBackground();
     }
     requestAnimationFrame(filmLoop);
   })(0);
