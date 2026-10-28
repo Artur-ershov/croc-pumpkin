@@ -78,6 +78,11 @@ html, body {
 }
 .sub-word-top { top: 86px; font-size: 120px; }
 
+/* Film background: a copy of the stage texture that app.js shakes and flickers frame by frame (filmBackground).
+   It overhangs the stage a little, so the shake never shows an edge. */
+.film-bg { position: absolute; inset: -4px; z-index: 0; pointer-events: none; background: var(--dark) url("assets/bg.png") center / cover no-repeat; }
+body.mobile .film-bg { position: fixed; }
+
 /* ── Pumpkin media slot ── */
 .pumpkin { position: absolute; z-index: 2; }
 .pumpkin img {
