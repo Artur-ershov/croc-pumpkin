@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Заколдованная тыква — прототип</title>
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <div class="viewport">
@@ -26,16 +26,10 @@
 
       <div class="col col-left">
         <p>Слова имеют значение, и иногда некачественные коммуникации могут сработать, как злое заклинание. Рассеять чары поможет контр-спелл, сформулированный по нашим правилам коммуникаций.</p>
-        <a class="btn-outline" href="#memo" id="memo-link">Ознакомиться с памяткой по коммуникациям</a>
+        <a class="link-memo" href="#memo" id="memo-link">Ознакомиться с памяткой по коммуникациям</a>
       </div>
       <div class="col col-right">
         <p>Пройди 4 сценария, в каждом накорми заколдованную тыкву коммуникациями «по-кроковски» и получи небольшое вознаграждение в конце.</p>
-        <ol class="lineup">
-          <li>СПРОСИТЬ</li>
-          <li>НАПОМНИТЬ</li>
-          <li>ПОБЛАГОДАРИТЬ</li>
-          <li>НЕ СОГЛАСИТЬСЯ</li>
-        </ol>
       </div>
       <button class="btn-cta btn-start" id="btn-start" type="button"><i class="star"></i>НАЧАТЬ ИГРУ</button>
     </section>
@@ -84,7 +78,7 @@
         <div class="reward-num"><b>N</b> БОБРОВ</div>
       </div>
       <div class="col col-right">
-        <div class="stars stars-done"><i></i><i></i><i></i><i></i></div>
+        <div class="stars stars-done"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
         <p class="muted">бобры начислим в течение следующей недели</p>
       </div>
     </section>
@@ -107,6 +101,6 @@
 
   </div>
 </div>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

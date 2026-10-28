@@ -184,7 +184,8 @@
     answer.value = answers[current] || "";
     const stars = $("#stars");
     const n = doneCount();
-    stars.innerHTML = SCENARIOS.map((_, i) => `<i class="${i < n ? "on" : ""}${i === popIndex ? " pop" : ""}"></i>`).join("");
+    stars.innerHTML = SCENARIOS.map((_, i) => `<i class="${i < n ? "on" : i === n ? "next" : ""}${i === popIndex ? " pop" : ""}"></i>`).join("")
+      + `<span>${n}/${SCENARIOS.length}</span>`;
     setPumpkin(pumpkinGame, s.mood);
     fit(word); placeColumns();
   }
