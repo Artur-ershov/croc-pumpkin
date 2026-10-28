@@ -180,7 +180,7 @@
       let i = f.tick - play.start;
       if (i >= n) {
         if (play.loop) i %= n;
-        else { i = n - 1; if (!play.done) { play.done = true; if (play.onEnd) setTimeout(play.onEnd); } }
+        else { i = n - 1; if (!play.done) { play.done = true; if (play.onEnd) setTimeout(() => { if (el._play === play) play.onEnd(); }); } } // a newer clip wins
       }
       const frame = play.frames[i];
       if (frame.complete && frame.naturalWidth) src = frame;
