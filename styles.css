@@ -235,6 +235,7 @@ html, body {
   position: absolute; inset: 0; z-index: 50;
   display: grid; place-items: center;
   background: rgba(0, 7, 6, .82);
+  box-shadow: 0 0 0 10000px rgba(0, 7, 6, .82); /* reaches past the stage into letterbox margins */
   animation: fade .3s ease;
 }
 .modal[hidden] { display: none; }
