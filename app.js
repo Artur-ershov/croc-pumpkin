@@ -28,12 +28,11 @@
   //    last frames match the PNG, so loops and hand-offs don't jump.
   //    A mood without frames for an action falls back to its PNG plus the CSS animation.
   const FRAMES = {
-    "base-idle": 40, "surprise-idle": 39, "surprise-eat": 15, "nerd-idle": 40, "nerd-eat": 16,
-    "happy-idle": 39, "happy-eat": 15, "happy-final": 40, "disagree-idle": 40, "disagree-eat": 15,
+    "base-idle": 40, "surprise-idle": 39, "surprise-eat": 15, "nerd-idle": 40, "nerd-eat": 17,
+    "happy-idle": 39, "happy-eat": 16, "happy-final": 40, "disagree-idle": 40, "disagree-eat": 18,
   };
-  const FRAMES_V = 2; // bump when the frame files change, so browsers don't keep old ones
+  const FRAMES_V = 3; // bump when the frame files change, so browsers don't keep old ones
   const clip = (name) => ({ dir: `assets/frames/${name}/`, n: FRAMES[name] });
-  const EAT_MS = 2100; // a bit longer than the eat clip
   const PUMPKIN = {
     base:     { image: "assets/pumpkin-base.png", idle: clip("base-idle") },
     surprise: { image: "assets/pumpkin-surprise.png", idle: clip("surprise-idle"), eat: clip("surprise-eat") },
@@ -139,7 +138,20 @@
   const SHAKE_SHIFT = 0.009; // share of the frame width at full shake
   const SHAKE_TILT = 1.2;  // degrees at full shake
   const FLICKER = 0.2;     // brightness swing at full flicker
-  const PAD = 0.03;        // the canvas is 6% bigger than the slot (styles.css), so the shake never crops
+  const PAD = 0.12;        // the canvas overhangs the slot by 12% a side (styles.css): room for shake, squash and jumps
+  // Cartoon cuts, one entry per film frame: sx/sy squash and stretch from the bottom, dy shift (share of the
+  // height, up is negative), flash brightness, puff draws dust clouds, hold keeps the previous picture.
+  const POOF = [  // scenario change: the old pumpkin squashes, a dusty flash, the new one pops up
+    { sx: 1.14, sy: 0.84, hold: true },
+    { sx: 0.6, sy: 0.6, flash: 1.9, puff: true, hold: true },
+    { sx: 0.88, sy: 1.14, dy: -0.06, puff: true },
+    { sx: 1.06, sy: 0.95 },
+  ];
+  const ENTER = [ // a screen opens: the pumpkin drops in, lands and straightens up
+    { sx: 0.86, sy: 1.16, dy: -0.12 },
+    { sx: 1.16, sy: 0.84, puff: true },
+    { sx: 0.96, sy: 1.05 },
+  ];
   // Three noise fields cycled frame to frame, like hand-drawn lines redrawn for every frame.
   const boilSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   boilSvg.setAttribute("width", "0"); boilSvg.setAttribute("height", "0"); boilSvg.setAttribute("aria-hidden", "true");
@@ -175,7 +187,8 @@
       else if (f.mood !== el.dataset.mood) src = png;
     } else src = png;
     f.tick++;
-    if (src) {
+    const fx = f.ready && el._fx && el._fx.length ? el._fx.shift() : null;
+    if (src && !(fx && fx.hold)) {
       const w = src.naturalWidth, h = src.naturalHeight;
       const sw = Math.min(w, 720), sh = Math.round(sw * h / w);
       if (f.snap.width !== sw || f.snap.height !== sh) { f.snap.width = sw; f.snap.height = sh; }
@@ -189,10 +202,25 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
     ctx.translate(cv.width / 2 + rnd(FILM.shake * SHAKE_SHIFT * cv.width), cv.height / 2 + rnd(FILM.shake * SHAKE_SHIFT * cv.width));
     ctx.rotate(rnd(FILM.shake * SHAKE_TILT) * Math.PI / 180);
+    if (fx) {
+      ctx.translate(0, snap.height / 2 + (fx.dy || 0) * snap.height);
+      ctx.scale(fx.sx || 1, fx.sy || 1);
+      ctx.translate(0, -snap.height / 2);
+    }
     ctx.drawImage(snap, -snap.width / 2, -snap.height / 2);
+    if (fx && fx.puff) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = "rgba(255, 236, 200, .55)";
+      for (let i = 0; i < 9; i++) {
+        const ang = Math.PI * (0.05 + 0.9 * Math.random()), r = 0.38 + Math.random() * 0.12;
+        ctx.beginPath();
+        ctx.arc(cv.width / 2 + Math.cos(ang) * r * cv.width, cv.height * 0.86 - Math.sin(ang) * r * 0.35 * cv.height, cv.width * (0.02 + Math.random() * 0.03), 0, 6.283);
+        ctx.fill();
+      }
+    }
     const filters = [];
     if (FILM.boil > 0) filters.push(`url(#film-boil${f.n++ % 3})`);
-    if (FILM.flicker > 0) filters.push(`brightness(${(1 + rnd(FILM.flicker * FLICKER)).toFixed(3)})`);
+    if (FILM.flicker > 0 || (fx && fx.flash)) filters.push(`brightness(${((fx && fx.flash) || 1 + rnd(FILM.flicker * FLICKER)).toFixed(3)})`);
     cv.style.filter = filters.join(" ") || "none";
   }
   let filmNext = 0;
@@ -210,8 +238,10 @@
     const media = PUMPKIN[mood] || PUMPKIN.base;
     const img = el.querySelector("img");
     if (!img.src.endsWith(media.image)) img.src = media.image;
+    const f = filmOf(el);
+    if (f.ready && el.dataset.mood !== mood && el.closest(".screen.is-active")) el._fx = POOF.slice();
     el.dataset.mood = mood;
-    const c = media[action], f = filmOf(el);
+    const c = media[action];
     el.classList.remove("idle", "eat", "happy");
     if (c) {
       el._play = { frames: framesOf(c), start: f.tick, loop: action !== "eat", onEnd: action === "eat" ? () => setPumpkin(el, mood) : null };
@@ -242,6 +272,7 @@
   function show(id) {
     document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
     replay(document.getElementById(id), "entering", 1500);
+    document.querySelectorAll(`#${id} [data-pumpkin]`).forEach((el) => { el._fx = ENTER.slice(); });
     viewport.scrollTop = 0;
     requestAnimationFrame(fitAll);
     if (document.body.classList.contains("mobile")) scrollTo({ top: 0, behavior: "smooth" });
@@ -360,10 +391,15 @@
   }
 
   // Text "flies" into the pumpkin, the pumpkin chews, progress updates.
+  // The eat clip starts on the click: its mouth opens while the answer flies in and snaps shut about when it
+  // arrives (~0.6 s). The next scenario waits for the whole clip.
   function feedAnimation(text) {
     return new Promise((resolve) => {
-      const hasClip = !!(PUMPKIN[SCENARIOS[current].mood] || PUMPKIN.base).eat;
-      if (document.body.classList.contains("mobile")) { setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); setTimeout(resolve, hasClip ? EAT_MS : 900); return; }
+      const eat = (PUMPKIN[SCENARIOS[current].mood] || PUMPKIN.base).eat;
+      const ms = eat ? eat.n / FILM.fps * 1000 + 100 : 1500;
+      setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat");
+      setTimeout(resolve, ms);
+      if (document.body.classList.contains("mobile")) return;
       const bite = document.createElement("div");
       bite.className = "bite";
       bite.textContent = text.length > 140 ? text.slice(0, 140) + "…" : text;
@@ -373,8 +409,7 @@
         bite.style.transform = "translate(720px, -400px) scale(.08) rotate(25deg)";
         bite.style.opacity = "0";
       }));
-      setTimeout(() => { bite.remove(); setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); }, 650);
-      setTimeout(resolve, hasClip ? 650 + EAT_MS : 1500);
+      setTimeout(() => bite.remove(), 650);
     });
   }
 
@@ -470,5 +505,6 @@
   document.fonts.ready.then(layout);
   layout();
   replay($("#screen-start"), "entering", 1500);
+  document.querySelectorAll("#screen-start [data-pumpkin]").forEach((el) => { el._fx = ENTER.slice(); });
   flushQueue();
 })();
