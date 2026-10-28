@@ -32,7 +32,7 @@ html, body {
 .f-ext-light, .sub-word, .stars span, .modal-title span {
   font-variation-settings: "wdth" 125, "wght" 300;
 }
-.f-medium, .head, .label, .link-memo {
+.f-medium, .label, .link-memo {
   font-variation-settings: "wdth" 100, "wght" 500;
 }
 
@@ -53,10 +53,11 @@ html, body {
 .screen.is-active { opacity: 1; visibility: visible; }
 
 .head {
-  position: absolute; left: 80px; right: 80px; top: 44px;
-  display: flex; justify-content: space-between;
-  color: var(--orange); font-size: 22px; letter-spacing: .12em;
+  position: absolute; left: 80px; top: 4px; z-index: 4;
+  display: flex; align-items: center; gap: 24px;
 }
+.logo-croc { font-size: 40px; color: var(--cream); font-variation-settings: "wdth" 115, "wght" 500; }
+.logo-hw { display: block; width: 300px; height: 110px; }
 
 .mega {
   position: absolute; left: 80px; top: 92px;
@@ -285,7 +286,9 @@ body.mobile .screen-start .pumpkin { order: 3; }
 body.mobile .screen-start .col-left { order: 4; }
 body.mobile .screen-start .col-right { order: 5; }
 body.mobile .screen-start .btn-start { order: 6; }
-body.mobile .head { font-size: 11px; }
+body.mobile .head { gap: 12px; margin: -16px 0 -20px; }
+body.mobile .logo-croc { font-size: 20px; }
+body.mobile .logo-hw { width: 150px; height: 55px; }
 body.mobile .mega { font-size: 60px; line-height: .85; }
 body.mobile .mega-outline { -webkit-text-stroke-width: 1.5px; }
 body.mobile .sub-word { font-size: 52px; }
