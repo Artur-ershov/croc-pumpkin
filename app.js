@@ -23,15 +23,27 @@
     },
   ];
 
-  // ── Pumpkin media. Put video paths here when the animations are ready:
-  //    e.g. surprise: { image: "...", idle: "assets/video/surprise-idle.webm", eat: "assets/video/surprise-eat.webm" }
-  const PUMPKIN = {
-    base:     { image: "assets/pumpkin-base.png" },
-    surprise: { image: "assets/pumpkin-surprise.png" },
-    nerd:     { image: "assets/pumpkin-nerd.png" },
-    happy:    { image: "assets/pumpkin-happy.png" },
-    disagree: { image: "assets/pumpkin-disagree.png" },
+  // ── Pumpkin media. Videos are black-background clips; CSS blends them in (mix-blend-mode: lighten).
+  //    They are generated from the base pumpkin, so while one plays the face is the base face.
+  //    A mood without a video for an action falls back to its PNG plus the CSS animation.
+  const VIDEO = {
+    idle:  "assets/video/pumpkin-idle.mp4",   // loops
+    eat:   "assets/video/pumpkin-eat.mp4",    // plays once, ~1.8 s
+    happy: "assets/video/pumpkin-happy.mp4",  // loops
   };
+  const EAT_MS = 1900; // a bit longer than the eat clip
+  const PUMPKIN = {
+    base:     { image: "assets/pumpkin-base.png", idle: VIDEO.idle, eat: VIDEO.eat },
+    surprise: { image: "assets/pumpkin-surprise.png", eat: VIDEO.eat },
+    nerd:     { image: "assets/pumpkin-nerd.png", eat: VIDEO.eat },
+    happy:    { image: "assets/pumpkin-happy.png", eat: VIDEO.eat, happy: VIDEO.happy },
+    disagree: { image: "assets/pumpkin-disagree.png", eat: VIDEO.eat },
+  };
+  // Start loading the clips right away so the first bite doesn't wait for the network.
+  new Set(Object.values(VIDEO)).forEach((src) => {
+    const v = document.createElement("video");
+    v.preload = "auto"; v.muted = true; v.src = src;
+  });
 
   // Same rule as «Растопи лёд»: any domain, one "@", non-empty parts, login not all digits.
   function isValidEmail(value) {
@@ -107,11 +119,19 @@
     if (!img.src.endsWith(media.image)) img.src = media.image;
     el.dataset.mood = mood;
     const src = media[action];
+    video.onended = video.onerror = null;
     if (src) {
+      const toImage = () => { el.classList.remove("has-video"); el.classList.add("idle"); };
       el.classList.add("has-video");
-      video.src = src; video.loop = action === "idle"; video.play().catch(() => {});
       el.classList.remove("idle", "eat", "happy");
+      if (!video.src.endsWith(src)) video.src = src;
+      video.loop = action !== "eat";
+      try { video.currentTime = 0; } catch {}
+      video.play().catch(toImage);
+      video.onerror = toImage;
+      if (action === "eat") video.onended = toImage;
     } else {
+      video.pause();
       el.classList.remove("has-video");
       el.classList.remove("idle", "eat", "happy");
       void el.offsetWidth; // restart CSS animation
@@ -257,7 +277,8 @@
   // Text "flies" into the pumpkin, the pumpkin chews, progress updates.
   function feedAnimation(text) {
     return new Promise((resolve) => {
-      if (document.body.classList.contains("mobile")) { setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); setTimeout(resolve, 900); return; }
+      const hasVideo = !!(PUMPKIN[SCENARIOS[current].mood] || PUMPKIN.base).eat;
+      if (document.body.classList.contains("mobile")) { setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); setTimeout(resolve, hasVideo ? EAT_MS : 900); return; }
       const bite = document.createElement("div");
       bite.className = "bite";
       bite.textContent = text.length > 140 ? text.slice(0, 140) + "…" : text;
@@ -268,7 +289,7 @@
         bite.style.opacity = "0";
       }));
       setTimeout(() => { bite.remove(); setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); }, 650);
-      setTimeout(resolve, 1500);
+      setTimeout(resolve, hasVideo ? 650 + EAT_MS : 1500);
     });
   }
 

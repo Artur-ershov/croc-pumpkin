@@ -86,6 +86,8 @@ html, body {
 .pumpkin video { display: none; }
 .pumpkin.has-video video { display: block; }
 .pumpkin.has-video img { visibility: hidden; }
+/* The clips have a black background; lighten drops it onto the stage texture and lets the headline show through. */
+.pumpkin.has-video { mix-blend-mode: lighten; }
 .pumpkin-start { left: 486px; top: 220px; width: 948px; height: 1080px; }
 .pumpkin-game  { left: 575px; top: 248px; width: 770px; height: 770px; }
 .pumpkin-final { left: 610px; top: 430px; width: 700px; height: 700px; }
