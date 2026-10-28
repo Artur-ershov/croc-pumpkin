@@ -139,8 +139,10 @@ html, body {
 }
 @media (hover: hover) { .btn-memo:hover { background: var(--green); color: var(--dark); } }
 .btn-memo:active { transform: scale(.97); }
-.screen-start .col-left { width: 406px; }
-.screen-start .col-right { left: 1458px; top: 592px; width: 320px; }
+.screen-start .col-left { top: 338px; width: 406px; }
+.screen-start .col-right { left: 1458px; top: 660px; width: 320px; }
+.screen-start .bat-2 { left: 192px; top: 693px; width: 192px; }
+body.mobile .br-desk { display: none; }
 
 /* Buttons */
 .btn-cta {
@@ -153,7 +155,7 @@ html, body {
 .btn-cta:hover { filter: brightness(1.08); transform: translateY(-2px); }
 .btn-cta:active { transform: translateY(1px); }
 .btn-cta:disabled { opacity: .45; cursor: default; transform: none; filter: none; }
-.btn-start { position: absolute; left: 650px; top: 912px; width: 620px; height: 128px; z-index: 5; }
+.btn-start { position: absolute; left: 1158px; top: 912px; width: 620px; height: 128px; z-index: 5; }
 .star {
   width: 40px; height: 40px; flex: none; background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0C12.9 7.2 16.8 11.1 24 12C16.8 12.9 12.9 16.8 12 24C11.1 16.8 7.2 12.9 0 12C7.2 11.1 11.1 7.2 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
