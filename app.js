@@ -3,23 +3,23 @@
   const SCENARIOS = [
     {
       tab: "СПРОСИТЬ", word: "СПРОСИТЬ", mood: "surprise",
-      text: "Представь, что тебе нужно уточнить информацию по проекту у коллеги: ты не можешь найти нужный файл в хранилище. Как бы ты сформулировал свое письмо в почте?",
+      text: "Представь, что тебе нужно уточнить информацию по\u00A0проекту у\u00A0коллеги: ты\u00A0не\u00A0можешь найти нужный файл в\u00A0хранилище. Как\u00A0бы ты\u00A0сформулировал свое письмо в\u00A0почте?",
       hint: null,
     },
     {
       tab: "НАПОМНИТЬ", word: "НАПОМНИТЬ", mood: "nerd",
-      text: "До сдачи проекта осталось 2 дня, и для завершения своей задачи тебе нужна готовая часть от коллеги из смежной команды, которую он обещал скинуть сегодня. Как ты напомнишь о задаче коллеге?",
-      hint: "(при вводе ответа можешь указать, где именно ты бы написал сообщение: в почте, Talks, Telegram или др.)",
+      text: "До\u00A0сдачи проекта осталось 2\u00A0дня, и\u00A0для\u00A0завершения своей задачи тебе нужна готовая часть от\u00A0коллеги из\u00A0смежной команды, которую он\u00A0обещал скинуть сегодня. Как ты\u00A0напомнишь о\u00A0задаче коллеге?",
+      hint: "(при\u00A0вводе ответа можешь указать, где именно ты\u00A0бы написал сообщение: в\u00A0почте, Talks, Telegram или\u00A0др.)",
     },
     {
       tab: "ПОБЛАГОДАРИТЬ", word: "ПОБЛАГОДАРИТЬ", mood: "happy",
-      text: "Коллега круто помог тебе в выполнении твоей задачи, подхватив ее часть. Как бы ты сформулировал сообщение с благодарностью?",
-      hint: "(При вводе ответа можешь указать, где именно ты бы написал сообщение: в почте, Talks, Telegram или др.; также укажи, если обычно выражаешь благодарность устно)",
+      text: "Коллега круто помог тебе в\u00A0выполнении твоей задачи, подхватив ее\u00A0часть. Как\u00A0бы ты\u00A0сформулировал сообщение с\u00A0благодарностью?",
+      hint: "(При\u00A0вводе ответа можешь указать, где именно ты\u00A0бы написал сообщение: в\u00A0почте, Talks, Telegram или\u00A0др.; также укажи, если обычно выражаешь благодарность устно)",
     },
     {
       tab: "НЕ СОГЛАСИТЬСЯ", word: "НЕ СОГЛАСИТЬСЯ", mood: "disagree",
-      text: "Коллега из твоей команды предлагает подход, с которым ты не согласен. Твое виденье тактики, которую команде стоит взять внутри проекта, кардинально отличается. Как бы ты начал сообщение, в котором бы описал предложение со своим подходом?",
-      hint: "(При вводе ответа можешь указать, где именно ты бы написал сообщение: в почте, Talks, Telegram или др.)",
+      text: "Коллега из\u00A0твоей команды предлагает подход, с\u00A0которым ты\u00A0не\u00A0согласен. Твое виденье тактики, которую команде стоит взять внутри проекта, кардинально отличается. Как\u00A0бы ты\u00A0начал сообщение, в\u00A0котором\u00A0бы описал предложение со\u00A0своим подходом?",
+      hint: "(При\u00A0вводе ответа можешь указать, где именно ты\u00A0бы написал сообщение: в\u00A0почте, Talks, Telegram или\u00A0др.)",
     },
   ];
 
@@ -122,8 +122,18 @@
   document.querySelectorAll("[data-pumpkin]").forEach((el) => setPumpkin(el, el.dataset.mood));
 
   // ── Screens ─────────────────────────────────────────────────────────────────
+  // Children of each screen get a stagger index for the entrance animation.
+  document.querySelectorAll(".screen").forEach((s) => [...s.children].forEach((el, i) => el.style.setProperty("--i", i)));
+  // Restart a one-off animation class and drop it afterwards, so it doesn't mask the element's own animations (idle, shake).
+  function replay(el, cls, ms) {
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    clearTimeout(el["t_" + cls]);
+    el["t_" + cls] = setTimeout(() => el.classList.remove(cls), ms);
+  }
+
   function show(id) {
     document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
+    replay(document.getElementById(id), "entering", 1500);
     requestAnimationFrame(fitAll);
     if (document.body.classList.contains("mobile")) scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -217,6 +227,7 @@
   function isDone(i) { return !!answers[i] || remoteDone.has(i); }
   function doneCount() { return SCENARIOS.filter((_, i) => isDone(i)).length; }
 
+  let shownScenario = -1;
   function renderGame(popIndex = -1) {
     const s = SCENARIOS[current];
     [...tabs.children].forEach((b, i) => {
@@ -238,6 +249,9 @@
       + `<span>${n}/${SCENARIOS.length}</span>`;
     setPumpkin(pumpkinGame, s.mood);
     fit(word); placeColumns();
+    // Scenario changed while the game is on screen: replay the word / question / hint / pumpkin entrance.
+    if (shownScenario !== -1 && shownScenario !== current) replay($("#screen-game"), "swap", 900);
+    shownScenario = current;
   }
 
   // Text "flies" into the pumpkin, the pumpkin chews, progress updates.
@@ -349,5 +363,6 @@
   // ── Boot ────────────────────────────────────────────────────────────────────
   document.fonts.ready.then(layout);
   layout();
+  replay($("#screen-start"), "entering", 1500);
   flushQueue();
 })();
