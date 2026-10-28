@@ -263,10 +263,11 @@
     const btn = $("#btn-feed");
     btn.disabled = true;
     const wasDone = isDone(current);
-    await feedAnimation(text);
+    // Save and send before the animation, so closing the tab mid-bite loses nothing.
     answers[current] = text;
     save();
     sendToBackend({ email, scenario: SCENARIOS[current].word, answer: text });
+    await feedAnimation(text);
     btn.disabled = false;
     const next = firstUndone();
     if (next === -1) { setTimeout(finish, 300); return; }
@@ -285,7 +286,7 @@
   }
 
   // Answers go to a Google Sheet via Apps Script (backend/Code.gs).
-  // Unsent ones wait in localStorage and are retried on the next submit or page load.
+  // Unsent ones wait in localStorage and are retried with backoff while the page is open, and on the next load.
   function sendToBackend(payload) {
     const queue = loadQueue();
     queue.push({ ...payload, ts: new Date().toISOString() });
@@ -299,24 +300,39 @@
     try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch {}
   }
   let flushing = false;
+  let retryTimer = null;
+  let retryCount = 0;
   async function flushQueue() {
     if (!BACKEND_URL || flushing) return;
     flushing = true;
+    clearTimeout(retryTimer);
+    let failed = false;
     try {
       let queue = loadQueue();
       while (queue.length) {
         // text/plain keeps it a simple request, so there is no CORS preflight
         const res = await fetch(BACKEND_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(queue[0]) });
-        if (!res.ok) break;
+        const data = await res.json().catch(() => null);
+        // "bad request" will never succeed, drop it; anything else ("busy", quota page, network) is retried
+        if (!data || (!data.ok && data.error !== "bad request")) { failed = true; break; }
         queue = loadQueue().slice(1);
         saveQueue(queue);
       }
     } catch (err) {
+      failed = true;
       console.warn("[pumpkin] send failed, will retry", err);
     } finally {
       flushing = false;
     }
+    if (failed) {
+      // 5s, 15s, 45s… up to 2 min, with jitter so a crowd doesn't retry in lockstep
+      const delay = Math.min(5000 * 3 ** retryCount++, 120000) * (0.5 + Math.random());
+      retryTimer = setTimeout(flushQueue, delay);
+    } else {
+      retryCount = 0;
+    }
   }
+  addEventListener("online", flushQueue);
 
   // ── 04: final ───────────────────────────────────────────────────────────────
   function finish() {
