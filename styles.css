@@ -37,7 +37,7 @@ html, body {
 }
 
 /* ── Stage: 1920×1080 design scaled to the window ── */
-.viewport { position: fixed; inset: 0; overflow: hidden; }
+.viewport { position: fixed; inset: 0; overflow: hidden; background: var(--dark) url("assets/bg.png") repeat; }
 .stage {
   position: absolute; left: 0; top: 0;
   width: 1920px; height: 1080px;
@@ -275,7 +275,7 @@ html, body {
 
 /* ── Mobile: reflow instead of scaling ── */
 html.mobile, body.mobile { overflow: visible; height: auto; }
-body.mobile .viewport { position: static; overflow: visible; }
+body.mobile .viewport { position: static; overflow: visible; background: none; }
 body.mobile .stage { position: relative; width: 100%; height: auto; min-height: 100vh; transform: none !important; background-attachment: fixed; }
 body.mobile .screen { position: relative; display: none; padding: 20px 20px 40px; max-width: 640px; margin: 0 auto; }
 body.mobile .screen.is-active { display: flex; flex-direction: column; gap: 18px; }

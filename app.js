@@ -50,6 +50,7 @@
 
   const $ = (s) => document.querySelector(s);
   const stage = $("#stage");
+  const viewport = $(".viewport");
 
   // ── Layout: scale the 1920×1080 stage, or reflow on phones ──────────────────
   function layout() {
@@ -68,7 +69,11 @@
     }
     stage.style.zoom = "";
     const s = Math.min(innerWidth / 1920, innerHeight / 1080);
-    stage.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
+    const tx = (innerWidth - 1920 * s) / 2, ty = (innerHeight - 1080 * s) / 2;
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+    // Letterbox margins continue the stage texture at the same scale, so the stars inside the stage stay put.
+    viewport.style.backgroundSize = `${1920 * s}px ${1080 * s}px`;
+    viewport.style.backgroundPosition = `${tx}px ${ty}px`;
     fitAll();
   }
   function fit(el) {
