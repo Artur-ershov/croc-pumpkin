@@ -23,27 +23,27 @@
     },
   ];
 
-  // ── Pumpkin media. Videos are black-background clips; CSS blends them in (mix-blend-mode: lighten).
-  //    They are generated from the base pumpkin, so while one plays the face is the base face.
+  // ── Pumpkin media. Videos are black-background clips made from each mood's PNG (first and last
+  //    frame = the PNG, so they loop and hand back to the image without a jump); CSS blends the
+  //    black away (mix-blend-mode: lighten). idle and happy loop, eat plays once (~2 s).
   //    A mood without a video for an action falls back to its PNG plus the CSS animation.
-  const VIDEO = {
-    idle:  "assets/video/pumpkin-idle.mp4",   // loops
-    eat:   "assets/video/pumpkin-eat.mp4",    // plays once, ~1.8 s
-    happy: "assets/video/pumpkin-happy.mp4",  // loops
-  };
-  const EAT_MS = 1900; // a bit longer than the eat clip
+  const clip = (mood, action) => `assets/video/${mood}-${action}.mp4`;
+  const EAT_MS = 2100; // a bit longer than the eat clip
   const PUMPKIN = {
-    base:     { image: "assets/pumpkin-base.png", idle: VIDEO.idle, eat: VIDEO.eat },
-    surprise: { image: "assets/pumpkin-surprise.png", eat: VIDEO.eat },
-    nerd:     { image: "assets/pumpkin-nerd.png", eat: VIDEO.eat },
-    happy:    { image: "assets/pumpkin-happy.png", eat: VIDEO.eat, happy: VIDEO.happy },
-    disagree: { image: "assets/pumpkin-disagree.png", eat: VIDEO.eat },
+    base:     { image: "assets/pumpkin-base.png", idle: clip("base", "idle"), eat: clip("base", "eat") },
+    surprise: { image: "assets/pumpkin-surprise.png", idle: clip("surprise", "idle"), eat: clip("surprise", "eat") },
+    nerd:     { image: "assets/pumpkin-nerd.png", idle: clip("nerd", "idle"), eat: clip("nerd", "eat") },
+    happy:    { image: "assets/pumpkin-happy.png", idle: clip("happy", "idle"), eat: clip("happy", "eat"), happy: clip("happy", "final") },
+    disagree: { image: "assets/pumpkin-disagree.png", idle: clip("disagree", "idle"), eat: clip("disagree", "eat") },
   };
-  // Start loading the clips right away so the first bite doesn't wait for the network.
-  new Set(Object.values(VIDEO)).forEach((src) => {
+  // Load a clip ahead of time (e.g. the eat clip while the idle one plays), so the bite doesn't wait for the network.
+  const warmed = new Map();
+  function warm(src) {
+    if (!src || warmed.has(src)) return;
     const v = document.createElement("video");
     v.preload = "auto"; v.muted = true; v.src = src;
-  });
+    warmed.set(src, v);
+  }
 
   // Same rule as «Растопи лёд»: any domain, one "@", non-empty parts, login not all digits.
   function isValidEmail(value) {
@@ -119,17 +119,20 @@
     if (!img.src.endsWith(media.image)) img.src = media.image;
     el.dataset.mood = mood;
     const src = media[action];
-    video.onended = video.onerror = null;
+    video.onended = video.onerror = video.onplaying = null;
     if (src) {
       const toImage = () => { el.classList.remove("has-video"); el.classList.add("idle"); };
-      el.classList.add("has-video");
-      el.classList.remove("idle", "eat", "happy");
-      if (!video.src.endsWith(src)) video.src = src;
-      video.loop = action !== "eat";
-      try { video.currentTime = 0; } catch {}
-      video.play().catch(toImage);
+      // The PNG (with its CSS idle) stays up until the clip really plays, so a slow network never leaves the slot empty.
+      el.classList.remove("has-video", "eat", "happy");
+      el.classList.add("idle");
+      video.onplaying = () => { el.classList.add("has-video"); el.classList.remove("idle"); };
       video.onerror = toImage;
-      if (action === "eat") video.onended = toImage;
+      if (action === "eat") video.onended = () => setPumpkin(el, mood);
+      video.loop = action !== "eat";
+      if (!video.src.endsWith(src)) video.src = src;
+      else try { video.currentTime = 0; } catch {}
+      video.play().catch(toImage);
+      warm(media.eat);
     } else {
       video.pause();
       el.classList.remove("has-video");
@@ -139,7 +142,11 @@
       if (action !== "idle") el.addEventListener("animationend", () => { el.classList.remove(action); el.classList.add("idle"); }, { once: true });
     }
   }
-  document.querySelectorAll("[data-pumpkin]").forEach((el) => setPumpkin(el, el.dataset.mood));
+  // Only the visible screen's pumpkin starts a clip; the others get theirs when their screen opens (renderGame, finish).
+  document.querySelectorAll("[data-pumpkin]").forEach((el) => {
+    if (el.closest(".screen.is-active")) setPumpkin(el, el.dataset.mood);
+    else el.querySelector("img").src = (PUMPKIN[el.dataset.mood] || PUMPKIN.base).image;
+  });
 
   // ── Screens ─────────────────────────────────────────────────────────────────
   // Children of each screen get a stagger index for the entrance animation.
@@ -153,6 +160,9 @@
 
   function show(id) {
     document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
+    // hidden screens keep no clip running
+    document.querySelectorAll(".screen:not(.is-active) .pumpkin video").forEach((v) => v.pause());
+    if (id === "screen-game") warm(PUMPKIN.happy.happy);
     replay(document.getElementById(id), "entering", 1500);
     requestAnimationFrame(fitAll);
     if (document.body.classList.contains("mobile")) scrollTo({ top: 0, behavior: "smooth" });
