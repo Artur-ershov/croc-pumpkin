@@ -9,7 +9,11 @@
 const SCENARIOS = ["СПРОСИТЬ", "НАПОМНИТЬ", "ПОБЛАГОДАРИТЬ", "НЕ СОГЛАСИТЬСЯ"];
 const LOG_SHEET = "Все ответы";
 const LOG_HEADER = ["Время", "Почта", "Сценарий", "Ответ"];
-const EMAIL_RE = /^[a-z0-9._%+-]+@croc\.ru$/;
+// Same rule as «Растопи лёд»: any domain, one "@", non-empty parts, login not all digits.
+function isValidEmail(email) {
+  const parts = email.split("@");
+  return parts.length === 2 && parts[0] !== "" && parts[1] !== "" && !/^\d+$/.test(parts[0]);
+}
 
 function doPost(e) {
   let data;
@@ -17,7 +21,7 @@ function doPost(e) {
   const email = String(data.email || "").trim().toLowerCase();
   const scenario = String(data.scenario || "");
   const answer = String(data.answer || "");
-  if (!EMAIL_RE.test(email) || SCENARIOS.indexOf(scenario) === -1 || !answer) {
+  if (!isValidEmail(email) || SCENARIOS.indexOf(scenario) === -1 || !answer) {
     return json({ ok: false, error: "bad request" });
   }
   const lock = LockService.getScriptLock();
@@ -34,7 +38,7 @@ function doPost(e) {
 // Answer texts are never returned.
 function doGet(e) {
   const email = String((e.parameter && e.parameter.email) || "").trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) return json({ ok: false, error: "bad request" });
+  if (!isValidEmail(email)) return json({ ok: false, error: "bad request" });
   const log = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
   if (!log || log.getLastRow() < 2) return json({ ok: true, done: [] });
   const rows = log.getRange(2, 2, log.getLastRow() - 1, 2).getValues(); // Почта, Сценарий
