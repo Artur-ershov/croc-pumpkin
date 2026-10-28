@@ -31,6 +31,7 @@
     "base-idle": 40, "surprise-idle": 39, "surprise-eat": 15, "nerd-idle": 40, "nerd-eat": 16,
     "happy-idle": 39, "happy-eat": 15, "happy-final": 40, "disagree-idle": 40, "disagree-eat": 15,
   };
+  const FRAMES_V = 2; // bump when the frame files change, so browsers don't keep old ones
   const clip = (name) => ({ dir: `assets/frames/${name}/`, n: FRAMES[name] });
   const EAT_MS = 2100; // a bit longer than the eat clip
   const PUMPKIN = {
@@ -47,7 +48,7 @@
     if (!frameCache.has(c.dir)) {
       frameCache.set(c.dir, Array.from({ length: c.n }, (_, i) => {
         const im = new Image();
-        im.src = c.dir + String(i).padStart(2, "0") + ".webp";
+        im.src = c.dir + String(i).padStart(2, "0") + ".webp?v=" + FRAMES_V;
         return im;
       }));
     }
