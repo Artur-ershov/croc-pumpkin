@@ -85,6 +85,10 @@
   const $ = (s) => document.querySelector(s);
   const stage = $("#stage");
   const viewport = $(".viewport");
+  // Film background on desktop: the whole window's texture, letterbox margins included (see filmBackground).
+  const filmBgOut = document.createElement("div");
+  filmBgOut.className = "film-bg film-bg-out";
+  viewport.prepend(filmBgOut);
 
   // ── Layout: scale the 1920×1080 stage, or reflow on phones ──────────────────
   function layout() {
@@ -108,6 +112,8 @@
     // Letterbox margins continue the stage texture at the same scale, so the stars inside the stage stay put.
     viewport.style.backgroundSize = `${1920 * s}px ${1080 * s}px`;
     viewport.style.backgroundPosition = `${tx}px ${ty}px`;
+    filmBgOut.style.backgroundSize = viewport.style.backgroundSize;
+    filmBgOut.style.backgroundPosition = `${tx + 4}px ${ty + 4}px`; // it overhangs the window by 4px
     fitAll();
   }
   function fit(el) {
@@ -203,8 +209,9 @@
   stage.prepend(filmBg);
   function filmBackground() {
     const rnd = (a) => (Math.random() * 2 - 1) * a;
-    filmBg.style.transform = FILM.shake > 0 ? `translate(${rnd(BG_SHIFT).toFixed(1)}px, ${rnd(BG_SHIFT).toFixed(1)}px)` : "";
-    filmBg.style.filter = FILM.flicker > 0 ? `brightness(${(1 + rnd(BG_FLICKER)).toFixed(3)})` : "";
+    const transform = FILM.shake > 0 ? `translate(${rnd(BG_SHIFT).toFixed(1)}px, ${rnd(BG_SHIFT).toFixed(1)}px)` : "";
+    const filter = FILM.flicker > 0 ? `brightness(${(1 + rnd(BG_FLICKER)).toFixed(3)})` : "";
+    for (const el of [filmBg, filmBgOut]) { el.style.transform = transform; el.style.filter = filter; }
   }
   let filmNext = 0;
   (function filmLoop(t) {

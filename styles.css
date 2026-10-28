@@ -82,6 +82,11 @@ html, body {
    It overhangs the stage a little, so the shake never shows an edge. */
 .film-bg { position: absolute; inset: -4px; z-index: 0; pointer-events: none; background: var(--dark) url("assets/bg.png") center / cover no-repeat; }
 body.mobile .film-bg { position: fixed; }
+/* Desktop: the window-wide copy (letterbox margins included) carries the texture, the stage itself stays clear. */
+.film-bg-out { background-repeat: repeat; }
+body:not(.mobile) .stage { background: none; }
+body:not(.mobile) .stage > .film-bg { display: none; }
+body.mobile .film-bg-out { display: none; }
 
 /* ── Pumpkin media slot ── */
 .pumpkin { position: absolute; z-index: 2; }
