@@ -3,7 +3,8 @@
 // тип «Веб-приложение», запуск от моего имени, доступ «Все». Полученный URL — в BACKEND_URL в app.js.
 //
 // Under a burst of players the account allows 30 simultaneous executions, so doPost only appends one
-// row and holds the lock for a fraction of a second. "По участникам" is rebuilt on demand from the menu.
+// row and holds the lock for a fraction of a second. "По участникам" is a live formula over the log:
+// run setupPeople() once from the editor to create it.
 
 const SCENARIOS = ["СПРОСИТЬ", "НАПОМНИТЬ", "ПОБЛАГОДАРИТЬ", "НЕ СОГЛАСИТЬСЯ"];
 const LOG_SHEET = "Все ответы";
@@ -24,7 +25,6 @@ function doPost(e) {
   if (!lock.tryLock(25000)) return json({ ok: false, error: "busy" }); // the game retries later
   try {
     sheet(SpreadsheetApp.getActiveSpreadsheet(), LOG_SHEET, LOG_HEADER).appendRow([new Date(), email, scenario, answer]);
-    SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
@@ -44,36 +44,26 @@ function doGet(e) {
   return json({ ok: true, done: Object.keys(done).map(Number).filter((i) => i >= 0).sort() });
 }
 
-function onOpen() {
-  SpreadsheetApp.getUi().createMenu("Тыква").addItem("Обновить «По участникам»", "buildPeople").addToUi();
-}
-
-// One row per player with the latest answer to each scenario, built from the log.
-function buildPeople() {
+// One row per player with the latest answer to each scenario. A single formula: the log is scanned
+// once to build "email|scenario" keys, and XLOOKUP from the bottom picks the latest answer.
+function setupPeople() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const log = sheet(ss, LOG_SHEET, LOG_HEADER);
-  const rows = log.getLastRow() < 2 ? [] : log.getRange(2, 1, log.getLastRow() - 1, 4).getValues();
-  const people = {};
-  const order = [];
-  rows.forEach((r) => {
-    const email = String(r[1]).toLowerCase();
-    const i = SCENARIOS.indexOf(String(r[2]));
-    if (!email || i === -1) return;
-    if (!people[email]) { people[email] = { answers: SCENARIOS.map(() => ""), updated: r[0] }; order.push(email); }
-    people[email].answers[i] = r[3];
-    people[email].updated = r[0];
-  });
-  const header = ["Почта"].concat(SCENARIOS, ["Пройдено", "Обновлено"]);
-  const out = [header].concat(order.map((email) => {
-    const p = people[email];
-    const filled = p.answers.filter(String).length;
-    return [email].concat(p.answers, [filled + "/" + SCENARIOS.length, p.updated]);
-  }));
+  sheet(ss, LOG_SHEET, LOG_HEADER);
   const sh = ss.getSheetByName(PEOPLE_SHEET) || ss.insertSheet(PEOPLE_SHEET);
-  sh.clearContents();
-  sh.getRange(1, 1, out.length, header.length).setValues(out);
+  sh.clear();
+  const header = ["Почта"].concat(SCENARIOS, ["Пройдено", "Обновлено"]);
+  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
   sh.setFrozenRows(1);
-  sh.getRange(1, 1, 1, header.length).setFontWeight("bold");
+  const L = "'" + LOG_SHEET + "'!";
+  const scen = "{" + SCENARIOS.map((x) => '"' + x + '"').join(",") + "}";
+  sh.getRange("A2").setFormula(
+    "=LET(tm, " + L + "A2:A, em, " + L + "B2:B, sc, " + L + "C2:C, ans, " + L + "D2:D," +
+    " key, em&\"|\"&sc, people, UNIQUE(FILTER(em, em<>\"\")), scen, " + scen + "," +
+    " MAKEARRAY(ROWS(people), " + (SCENARIOS.length + 2) + ", LAMBDA(r, c, LET(e, INDEX(people, r)," +
+    " IF(c <= " + SCENARIOS.length + ", XLOOKUP(e&\"|\"&INDEX(scen, 1, c), key, ans, \"\", 0, -1)," +
+    " IF(c = " + (SCENARIOS.length + 1) + ", COUNTUNIQUEIFS(sc, em, e)&\"/" + SCENARIOS.length + "\", MAXIFS(tm, em, e)))))))"
+  );
+  sh.getRange(2, header.length, sh.getMaxRows() - 1, 1).setNumberFormat("dd.mm.yyyy hh:mm");
 }
 
 function sheet(ss, name, header) {
