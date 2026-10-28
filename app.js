@@ -143,7 +143,7 @@
   // height, up is negative), flash brightness, puff draws dust clouds, hold keeps the previous picture.
   const POOF = [  // scenario change: the old pumpkin squashes, a dusty flash, the new one pops up
     { sx: 1.14, sy: 0.84, hold: true },
-    { sx: 0.6, sy: 0.6, flash: 1.9, puff: true, hold: true },
+    { sx: 0.6, sy: 0.6, flash: 1.2, puff: true, hold: true },
     { sx: 0.88, sy: 1.14, dy: -0.06, puff: true },
     { sx: 1.06, sy: 0.95 },
   ];
