@@ -23,27 +23,43 @@
     },
   ];
 
-  // ── Pumpkin media. Videos are black-background clips made from each mood's PNG (first and last
-  //    frame = the PNG, so they loop and hand back to the image without a jump); CSS blends the
-  //    black away (mix-blend-mode: lighten). idle and happy loop, eat plays once (~2 s).
-  //    A mood without a video for an action falls back to its PNG plus the CSS animation.
-  const clip = (mood, action) => `assets/video/${mood}-${action}.mp4`;
+  // ── Pumpkin media. Each mood has pre-rendered frames (transparent WebP, 8 per second, made from that
+  //    mood's PNG): idle loops, eat plays once (~2 s), happy-final loops on the final screen. The first and
+  //    last frames match the PNG, so loops and hand-offs don't jump.
+  //    A mood without frames for an action falls back to its PNG plus the CSS animation.
+  const FRAMES = {
+    "base-idle": 40, "surprise-idle": 39, "surprise-eat": 15, "nerd-idle": 40, "nerd-eat": 16,
+    "happy-idle": 39, "happy-eat": 15, "happy-final": 40, "disagree-idle": 40, "disagree-eat": 15,
+  };
+  const clip = (name) => ({ dir: `assets/frames/${name}/`, n: FRAMES[name] });
   const EAT_MS = 2100; // a bit longer than the eat clip
   const PUMPKIN = {
-    base:     { image: "assets/pumpkin-base.png", idle: clip("base", "idle"), eat: clip("base", "eat") },
-    surprise: { image: "assets/pumpkin-surprise.png", idle: clip("surprise", "idle"), eat: clip("surprise", "eat") },
-    nerd:     { image: "assets/pumpkin-nerd.png", idle: clip("nerd", "idle"), eat: clip("nerd", "eat") },
-    happy:    { image: "assets/pumpkin-happy.png", idle: clip("happy", "idle"), eat: clip("happy", "eat"), happy: clip("happy", "final") },
-    disagree: { image: "assets/pumpkin-disagree.png", idle: clip("disagree", "idle"), eat: clip("disagree", "eat") },
+    base:     { image: "assets/pumpkin-base.png", idle: clip("base-idle") },
+    surprise: { image: "assets/pumpkin-surprise.png", idle: clip("surprise-idle"), eat: clip("surprise-eat") },
+    nerd:     { image: "assets/pumpkin-nerd.png", idle: clip("nerd-idle"), eat: clip("nerd-eat") },
+    happy:    { image: "assets/pumpkin-happy.png", idle: clip("happy-idle"), eat: clip("happy-eat"), happy: clip("happy-final") },
+    disagree: { image: "assets/pumpkin-disagree.png", idle: clip("disagree-idle"), eat: clip("disagree-eat") },
   };
-  // Load a clip ahead of time (e.g. the eat clip while the idle one plays), so the bite doesn't wait for the network.
-  const warmed = new Map();
-  function warm(src) {
-    if (!src || warmed.has(src)) return;
-    const v = document.createElement("video");
-    v.preload = "auto"; v.muted = true; v.src = src;
-    warmed.set(src, v);
+  // Every frame starts downloading on page load: the start screen first, then clip by clip in the order
+  // the game shows them. The images stay referenced here, so the browser keeps them.
+  const frameCache = new Map();
+  function framesOf(c) {
+    if (!frameCache.has(c.dir)) {
+      frameCache.set(c.dir, Array.from({ length: c.n }, (_, i) => {
+        const im = new Image();
+        im.src = c.dir + String(i).padStart(2, "0") + ".webp";
+        return im;
+      }));
+    }
+    return frameCache.get(c.dir);
   }
+  const arrived = (im) => im.complete ? Promise.resolve() : new Promise((done) => {
+    im.addEventListener("load", done, { once: true }); im.addEventListener("error", done, { once: true });
+  });
+  (async () => {
+    const order = [PUMPKIN.base.idle, ...SCENARIOS.flatMap((s) => [PUMPKIN[s.mood].idle, PUMPKIN[s.mood].eat]), PUMPKIN.happy.happy];
+    for (const c of order) if (c) await Promise.all(framesOf(c).map(arrived));
+  })();
 
   // Same rule as «Растопи лёд»: any domain, one "@", non-empty parts, login not all digits.
   function isValidEmail(value) {
@@ -112,22 +128,17 @@
   addEventListener("resize", layout);
 
   // ── Film look ───────────────────────────────────────────────────────────────
-  // The visible pumpkin is a canvas redrawn FILM.fps times a second from the clip (or the PNG), so motion
+  // The visible pumpkin is a canvas redrawn FILM.fps times a second from the frames (or the PNG), so motion
   // steps like an old cartoon. Boil (edges wobble), shake and flicker change only on those steps.
-  // Strengths are 0..1; the tuner panel (SHOW_TUNER) moves them live and remembers them in this browser.
-  const SHOW_TUNER = true;
-  const FILM_KEY = "croc-pumpkin-film";
-  const FILM_DEFAULTS = { fps: 8, boil: 0.5, shake: 0.5, flicker: 0.5 };
+  // Strengths are 0..1. The live tuner panel used to pick these values is kept in dev/film-tuner.md.
+  const FILM_DEFAULTS = { fps: 8, boil: 0.2, shake: 0.5, flicker: 0.5 };
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) Object.assign(FILM_DEFAULTS, { boil: 0, shake: 0, flicker: 0 });
   const FILM = { ...FILM_DEFAULTS };
-  try { Object.assign(FILM, JSON.parse(localStorage.getItem(FILM_KEY) || "{}")); } catch {}
-  function saveFilm() { try { localStorage.setItem(FILM_KEY, JSON.stringify(FILM)); } catch {} }
   const BOIL_PX = 14;      // displacement at full boil
   const SHAKE_SHIFT = 0.009; // share of the frame width at full shake
   const SHAKE_TILT = 1.2;  // degrees at full shake
   const FLICKER = 0.2;     // brightness swing at full flicker
   const PAD = 0.03;        // the canvas is 6% bigger than the slot (styles.css), so the shake never crops
-  const KEY_LO = 14, KEY_HI = 30; // clip pixels darker than KEY_LO turn transparent, fading in up to KEY_HI
   // Three noise fields cycled frame to frame, like hand-drawn lines redrawn for every frame.
   const boilSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   boilSvg.setAttribute("width", "0"); boilSvg.setAttribute("height", "0"); boilSvg.setAttribute("aria-hidden", "true");
@@ -141,35 +152,36 @@
     if (!el._film) {
       const cv = document.createElement("canvas"), snap = document.createElement("canvas");
       el.appendChild(cv); el.classList.add("film");
-      el._film = { cv, ctx: cv.getContext("2d"), snap, sctx: snap.getContext("2d"), n: 0, ready: false };
+      el._film = { cv, ctx: cv.getContext("2d"), snap, sctx: snap.getContext("2d"), n: 0, tick: 0, ready: false, mood: "" };
     }
     return el._film;
   }
-  // One frame: take a clean copy of the source (clip if it is playing, else the PNG), then draw it shaken.
-  // While a new clip is still loading the last frame is kept, so clips cut frame to frame.
+  // One frame: take a clean copy of the source (the clip's current frame, else the PNG), then draw it shaken.
+  // A frame that hasn't arrived yet keeps the previous one on screen; a new mood shows its PNG meanwhile.
   function filmFrame(el) {
-    const f = filmOf(el), img = el.querySelector("img"), video = el.querySelector("video");
-    let src = null, w = 0, h = 0;
-    if (el.classList.contains("has-video")) {
-      if (video.readyState >= 2) { src = video; w = video.videoWidth; h = video.videoHeight; }
-    } else if (img.complete && img.naturalWidth) { src = img; w = img.naturalWidth; h = img.naturalHeight; }
+    const f = filmOf(el), img = el.querySelector("img"), play = el._play;
+    const png = img.complete && img.naturalWidth ? img : null;
+    let src = null;
+    if (play) {
+      const n = play.frames.length;
+      let i = f.tick - play.start;
+      if (i >= n) {
+        if (play.loop) i %= n;
+        else { i = n - 1; if (!play.done) { play.done = true; if (play.onEnd) setTimeout(play.onEnd); } }
+      }
+      const frame = play.frames[i];
+      if (frame.complete && frame.naturalWidth) src = frame;
+      else if (f.mood !== el.dataset.mood) src = png;
+    } else src = png;
+    f.tick++;
     if (src) {
-      const sw = 720, sh = Math.round(720 * h / w);
+      const w = src.naturalWidth, h = src.naturalHeight;
+      const sw = Math.min(w, 720), sh = Math.round(sw * h / w);
       if (f.snap.width !== sw || f.snap.height !== sh) { f.snap.width = sw; f.snap.height = sh; }
       const cw = Math.round(sw * (1 + 2 * PAD)), ch = Math.round(sh * (1 + 2 * PAD));
       if (f.cv.width !== cw || f.cv.height !== ch) { f.cv.width = cw; f.cv.height = ch; }
-      f.sctx.clearRect(0, 0, sw, sh); f.sctx.drawImage(src, 0, 0, sw, sh); f.ready = true;
-      // The clip's black background becomes transparent, so the stage texture shows through
-      // even where blending is lost (the boil filter breaks mix-blend-mode in some renderers).
-      if (src === video) {
-        const data = f.sctx.getImageData(0, 0, sw, sh), px = data.data;
-        for (let i = 0; i < px.length; i += 4) {
-          const m = Math.max(px[i], px[i + 1], px[i + 2]);
-          if (m < KEY_LO) px[i + 3] = 0;
-          else if (m < KEY_HI) px[i + 3] = (m - KEY_LO) * 255 / (KEY_HI - KEY_LO);
-        }
-        f.sctx.putImageData(data, 0, 0);
-      }
+      f.sctx.clearRect(0, 0, sw, sh); f.sctx.drawImage(src, 0, 0, sw, sh);
+      f.ready = true; f.mood = el.dataset.mood;
     }
     if (!f.ready) return;
     const { cv, ctx, snap } = f, rnd = (a) => (Math.random() * 2 - 1) * a;
@@ -192,70 +204,24 @@
     requestAnimationFrame(filmLoop);
   })(0);
 
-  // ── Tuner panel: live sliders for the film look ─────────────────────────────
-  if (SHOW_TUNER) {
-    const panel = document.createElement("details");
-    panel.className = "tuner";
-    try { panel.open = localStorage.getItem(FILM_KEY + "-open") === "1"; } catch {}
-    panel.addEventListener("toggle", () => { try { localStorage.setItem(FILM_KEY + "-open", panel.open ? "1" : "0"); } catch {} });
-    panel.innerHTML = `<summary>Плёнка</summary><div class="tuner-body"></div>`;
-    const body = panel.querySelector(".tuner-body");
-    const rows = [["fps", "Кадров в секунду", 4, 24], ["boil", "Дрожание контура", 0, 100], ["shake", "Тряска кадра", 0, 100], ["flicker", "Мерцание", 0, 100]];
-    const sync = [];
-    rows.forEach(([key, label, min, max]) => {
-      const row = document.createElement("label");
-      row.className = "tuner-row";
-      row.innerHTML = `<span>${label}</span><b></b><input type="range" id="tuner-${key}" min="${min}" max="${max}" step="1">`;
-      const input = row.querySelector("input"), out = row.querySelector("b");
-      const show = () => {
-        input.value = key === "fps" ? FILM.fps : Math.round(FILM[key] * 100);
-        out.textContent = key === "fps" ? String(FILM.fps) : input.value + "%";
-      };
-      input.addEventListener("input", () => {
-        FILM[key] = key === "fps" ? Number(input.value) : input.value / 100;
-        out.textContent = key === "fps" ? input.value : input.value + "%";
-        if (key === "boil") applyBoil();
-        saveFilm();
-      });
-      show(); sync.push(show); body.appendChild(row);
-    });
-    const reset = document.createElement("button");
-    reset.type = "button"; reset.className = "tuner-reset"; reset.textContent = "Сбросить";
-    reset.addEventListener("click", () => { Object.assign(FILM, FILM_DEFAULTS); applyBoil(); saveFilm(); sync.forEach((s) => s()); });
-    body.appendChild(reset);
-    document.body.appendChild(panel);
-  }
-
   // ── Pumpkin slot ────────────────────────────────────────────────────────────
   function setPumpkin(el, mood, action = "idle") {
     const media = PUMPKIN[mood] || PUMPKIN.base;
     const img = el.querySelector("img");
-    const video = el.querySelector("video");
     if (!img.src.endsWith(media.image)) img.src = media.image;
-    // A new mood shows its PNG right away; within one mood the film holds the last frame until the next clip plays.
-    if (el.dataset.mood !== mood) el.classList.remove("has-video");
     el.dataset.mood = mood;
-    const src = media[action];
-    video.onended = video.onerror = video.onplaying = null;
+    const c = media[action], f = filmOf(el);
     el.classList.remove("idle", "eat", "happy");
-    if (src) {
-      const toImage = () => { el.classList.remove("has-video"); el.classList.add("idle"); };
-      video.onplaying = () => el.classList.add("has-video");
-      video.onerror = toImage;
-      if (action === "eat") video.onended = () => setPumpkin(el, mood);
-      video.loop = action !== "eat";
-      if (!video.src.endsWith(src)) video.src = src;
-      else try { video.currentTime = 0; } catch {}
-      video.play().catch(toImage);
-      warm(media.eat);
+    if (c) {
+      el._play = { frames: framesOf(c), start: f.tick, loop: action !== "eat", onEnd: action === "eat" ? () => setPumpkin(el, mood) : null };
     } else {
-      video.pause();
-      el.classList.remove("has-video");
+      el._play = null;
       void el.offsetWidth; // restart CSS animation
       el.classList.add(action);
       if (action !== "idle") el.addEventListener("animationend", () => { el.classList.remove(action); el.classList.add("idle"); }, { once: true });
     }
   }
+
   // Only the visible screen's pumpkin starts a clip; the others get theirs when their screen opens (renderGame, finish).
   document.querySelectorAll("[data-pumpkin]").forEach((el) => {
     if (el.closest(".screen.is-active")) setPumpkin(el, el.dataset.mood);
@@ -274,10 +240,8 @@
 
   function show(id) {
     document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
-    // hidden screens keep no clip running
-    document.querySelectorAll(".screen:not(.is-active) .pumpkin video").forEach((v) => v.pause());
-    if (id === "screen-game") warm(PUMPKIN.happy.happy);
     replay(document.getElementById(id), "entering", 1500);
+    viewport.scrollTop = 0;
     requestAnimationFrame(fitAll);
     if (document.body.classList.contains("mobile")) scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -346,10 +310,6 @@
       return new Set(); // offline or old script version: fall back to this browser's progress
     }
   }
-  $("#memo-link").addEventListener("click", (e) => {
-    e.preventDefault();
-    // TODO: ссылка на памятку по коммуникациям
-  });
 
   // ── 03: scenarios ───────────────────────────────────────────────────────────
   const tabs = $("#tabs");
@@ -401,8 +361,8 @@
   // Text "flies" into the pumpkin, the pumpkin chews, progress updates.
   function feedAnimation(text) {
     return new Promise((resolve) => {
-      const hasVideo = !!(PUMPKIN[SCENARIOS[current].mood] || PUMPKIN.base).eat;
-      if (document.body.classList.contains("mobile")) { setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); setTimeout(resolve, hasVideo ? EAT_MS : 900); return; }
+      const hasClip = !!(PUMPKIN[SCENARIOS[current].mood] || PUMPKIN.base).eat;
+      if (document.body.classList.contains("mobile")) { setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); setTimeout(resolve, hasClip ? EAT_MS : 900); return; }
       const bite = document.createElement("div");
       bite.className = "bite";
       bite.textContent = text.length > 140 ? text.slice(0, 140) + "…" : text;
@@ -413,7 +373,7 @@
         bite.style.opacity = "0";
       }));
       setTimeout(() => { bite.remove(); setPumpkin(pumpkinGame, SCENARIOS[current].mood, "eat"); }, 650);
-      setTimeout(resolve, hasVideo ? 650 + EAT_MS : 1500);
+      setTimeout(resolve, hasClip ? 650 + EAT_MS : 1500);
     });
   }
 

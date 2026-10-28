@@ -37,7 +37,7 @@ html, body {
 }
 
 /* ── Stage: 1920×1080 design scaled to the window ── */
-.viewport { position: fixed; inset: 0; overflow: hidden; background: var(--dark) url("assets/bg.png") repeat; }
+.viewport { position: fixed; inset: 0; overflow: hidden; overflow: clip; /* clip: the browser can't scroll it to a focused field either */ background: var(--dark) url("assets/bg.png") repeat; }
 .stage {
   position: absolute; left: 0; top: 0;
   width: 1920px; height: 1080px;
@@ -78,19 +78,15 @@ html, body {
 }
 .sub-word-top { top: 86px; font-size: 120px; }
 
-/* ── Pumpkin media slot (image now, video later) ── */
+/* ── Pumpkin media slot ── */
 .pumpkin { position: absolute; z-index: 2; }
-.pumpkin img, .pumpkin video {
+.pumpkin img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
 }
-.pumpkin video { display: none; }
-/* Film: the visible pumpkin is a canvas redrawn frame by frame (app.js, FILM); img and video are only its sources.
-   The canvas overhangs the slot by 3% on each side, so the frame shake never crops it. The clips have a black
-   background; lighten drops it onto the stage texture and lets the headline show through. */
+/* Film: the visible pumpkin is a canvas redrawn frame by frame from transparent frames (app.js, FILM); the img
+   is the PNG fallback and first paint. The canvas overhangs the slot by 3% on each side, so the shake never crops it. */
 .pumpkin canvas { position: absolute; inset: -3%; width: 106%; height: 106%; object-fit: contain; pointer-events: none; }
-.pumpkin.film { mix-blend-mode: lighten; }
 .pumpkin.film img { visibility: hidden; }
-.pumpkin.film video { display: block; opacity: 0; }
 .pumpkin-start { left: 486px; top: 220px; width: 948px; height: 1080px; }
 .pumpkin-game  { left: 575px; top: 248px; width: 770px; height: 770px; }
 .pumpkin-final { left: 610px; top: 430px; width: 700px; height: 700px; }
@@ -135,6 +131,14 @@ html, body {
   color: var(--green); text-decoration: none; font-size: 24px;
 }
 .link-memo:hover { text-decoration: underline; }
+.btn-memo {
+  align-self: flex-start; padding: 14px 28px; border-radius: 999px;
+  border: 2px solid var(--green); color: var(--cream); text-decoration: none; font-size: 24px;
+  font-variation-settings: "wdth" 100, "wght" 500;
+  transition: background .2s, color .2s, transform .15s;
+}
+@media (hover: hover) { .btn-memo:hover { background: var(--green); color: var(--dark); } }
+.btn-memo:active { transform: scale(.97); }
 .screen-start .col-left { width: 406px; }
 .screen-start .col-right { left: 1458px; top: 592px; width: 320px; }
 
@@ -240,6 +244,7 @@ html, body {
   position: absolute; inset: 0; z-index: 50;
   display: grid; place-items: center;
   background: rgba(0, 7, 6, .82);
+  box-shadow: 0 0 0 10000px rgba(0, 7, 6, .82); /* reaches past the stage into letterbox margins */
   animation: fade .3s ease;
 }
 .modal[hidden] { display: none; }
@@ -302,7 +307,7 @@ body.mobile .screen-start .pumpkin { order: 3; }
 body.mobile .screen-start .col-left { order: 4; }
 body.mobile .screen-start .col-right { order: 5; }
 body.mobile .screen-start .btn-start { order: 6; }
-body.mobile .head { gap: 12px; margin: -16px 0 -20px; order: -2; }
+body.mobile .head { gap: 12px; margin: -16px 0 -6px; order: -2; }
 body.mobile .logo-croc { font-size: 20px; }
 body.mobile .logo-hw { width: 150px; height: 55px; }
 body.mobile .mega { font-size: 60px; line-height: .85; }
@@ -310,10 +315,14 @@ body.mobile .mega-outline { -webkit-text-stroke-width: 1.5px; }
 body.mobile .sub-word { font-size: 52px; }
 body.mobile .sub-word-top { font-size: 40px; order: -1; }
 body.mobile .pumpkin { width: 100%; height: 300px; }
+/* Start screen: «тыква» sits right under the title and the pumpkin tucks under it, as on desktop */
+body.mobile .screen-start .sub-word { margin-top: -14px; line-height: .9; }
+body.mobile .screen-start .pumpkin { margin-top: -34px; }
 body.mobile .bat, body.mobile .sticker { display: none; }
 body.mobile .col { gap: 16px; }
 body.mobile .col p { font-size: 16px; }
 body.mobile .link-memo { font-size: 15px; width: auto; }
+body.mobile .btn-memo { font-size: 16px; padding: 12px 20px; align-self: stretch; text-align: center; }
 body.mobile .btn-cta { font-size: 28px; padding: 20px; border-radius: 20px; width: 100%; }
 body.mobile .star { width: 22px; height: 22px; }
 body.mobile .tabs { justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; margin: 0 -20px; padding-left: 20px; }
@@ -359,31 +368,6 @@ body.mobile .modal-help { font-size: 14px; }
 @keyframes tab-on { from { transform: scale(.88); } }
 .btn-cta:active { transform: scale(.97); }
 .btn-round:not(:disabled):active { transform: scale(.92); }
-
-/* ── Film tuner panel (SHOW_TUNER in app.js) ── */
-.tuner {
-  position: fixed; z-index: 100; width: 280px;
-  right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top));
-  background: rgba(0, 7, 6, .92); border: 1.5px solid var(--orange-deep); border-radius: 16px; color: var(--cream);
-}
-.tuner:not([open]) { width: auto; }
-.tuner summary {
-  padding: 10px 16px; cursor: pointer; list-style: none; color: var(--orange); font-size: 22px;
-  font-variation-settings: "wdth" 75, "wght" 800;
-}
-.tuner summary::-webkit-details-marker { display: none; }
-.tuner summary::after { content: "–"; float: right; margin-left: 14px; }
-.tuner:not([open]) summary::after { content: "+"; }
-.tuner summary:focus-visible, .tuner input:focus-visible, .tuner-reset:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
-.tuner-body { display: flex; flex-direction: column; gap: 12px; padding: 2px 16px 16px; }
-.tuner-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; font-size: 15px; }
-.tuner-row b { color: var(--orange); font-weight: 600; font-variant-numeric: tabular-nums; }
-.tuner-row input { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--orange); }
-.tuner-reset {
-  align-self: flex-start; padding: 6px 14px; border: 1.5px solid var(--orange-deep); border-radius: 999px;
-  background: none; color: var(--cream); font: inherit; font-size: 14px; cursor: pointer;
-}
-body.mobile .tuner[open] { left: max(12px, env(safe-area-inset-left)); width: auto; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
