@@ -37,7 +37,7 @@
   const STORE_KEY = "croc-pumpkin-v1";
   const QUEUE_KEY = "croc-pumpkin-outbox";
   // Apps Script web app URL (see backend/Code.gs). Empty = answers stay in the browser only.
-  const BACKEND_URL = "";
+  const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxzIIGbCbaGACQXJI12tUEkL2mwcIROfMdq7Hq52IVVdMJoihKg1VRnHZuHgndSX_E7Mg/exec";
 
   // ── State ───────────────────────────────────────────────────────────────────
   const params = new URLSearchParams(location.search);
