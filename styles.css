@@ -300,6 +300,8 @@ body.mobile .br-desk { display: none; }
 html.mobile, body.mobile { overflow: visible; height: auto; }
 body.mobile .viewport { position: static; overflow: visible; background: none; }
 body.mobile .stage { position: relative; width: 100%; height: auto; min-height: 100vh; transform: none !important; background-attachment: fixed; }
+/* the pumpkin canvas is drawn a bit larger than its slot (room for the shake): never let it widen the page */
+body.mobile .stage { overflow-x: hidden; overflow-x: clip; }
 body.mobile .screen { position: relative; display: none; padding: 20px 20px 40px; max-width: 640px; margin: 0 auto; }
 body.mobile .screen.is-active { display: flex; flex-direction: column; gap: 18px; }
 body.mobile .screen > * { position: relative; left: auto; right: auto; top: auto; width: auto; height: auto; transform: none; }
@@ -319,7 +321,14 @@ body.mobile .sub-word-top { font-size: 40px; order: -1; }
 body.mobile .pumpkin { width: 100%; height: 300px; }
 /* Start screen: «тыква» sits right under the title and the pumpkin tucks under it, as on desktop */
 body.mobile .screen-start .sub-word { margin-top: -14px; line-height: .9; }
-body.mobile .screen-start .pumpkin { margin-top: -34px; }
+/* Mobile edits from Figma («Вариант 2 · чистовик · мобильная», second row) */
+body.mobile .screen-start .head { align-self: center; left: -5px; }
+body.mobile .screen-start .mega, body.mobile .screen-start .sub-word { z-index: 3; }
+body.mobile .screen-start .pumpkin { height: 373px; margin: -89px 0 -39px; z-index: 1; }
+body.mobile .screen-game .pumpkin { margin: -57px 0 -13px; }
+body.mobile .screen-game .col-question { margin-bottom: 30px; }
+body.mobile .screen-final .pumpkin { margin: -57px 0 -13px; }
+body.mobile .screen-final .reward { margin-bottom: 40px; }
 body.mobile .bat, body.mobile .sticker { display: none; }
 body.mobile .col { gap: 16px; }
 body.mobile .col p { font-size: 16px; }
@@ -339,7 +348,8 @@ body.mobile .answer textarea { font-size: 17px; padding: 16px 18px; border-radiu
 body.mobile .reward-num { font-size: 76px; }
 body.mobile .muted { font-size: 16px !important; }
 body.mobile .modal { position: fixed; align-items: end; grid-template-columns: minmax(0, 1fr); }
-body.mobile .modal-card { width: 100%; border-radius: 28px 28px 0 0; padding: 28px 20px 34px; gap: 18px; }
+/* bottom sheet: only the top border shows, as if the card ran past the screen edges */
+body.mobile .modal-card { width: 100%; border-width: 3px 0 0; border-radius: 28px 28px 0 0; padding: 28px 23px 37px; gap: 18px; }
 body.mobile .modal-title b { font-size: 48px; }
 body.mobile .modal-title span { font-size: 24px; white-space: normal; }
 body.mobile .email-field { padding-left: 22px; }
