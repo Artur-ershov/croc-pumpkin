@@ -28,10 +28,10 @@
   //    last frames match the PNG, so loops and hand-offs don't jump.
   //    A mood without frames for an action falls back to its PNG plus the CSS animation.
   const FRAMES = {
-    "base-idle": 40, "surprise-idle": 39, "surprise-eat": 15, "nerd-idle": 40, "nerd-eat": 17,
+    "base-idle": 40, "surprise-idle": 39, "surprise-eat": 18, "nerd-idle": 40, "nerd-eat": 17,
     "happy-idle": 39, "happy-eat": 16, "happy-final": 40, "disagree-idle": 40, "disagree-eat": 18,
   };
-  const FRAMES_V = 3; // bump when the frame files change, so browsers don't keep old ones
+  const FRAMES_V = 4; // bump when the frame files change, so browsers don't keep old ones
   const clip = (name) => ({ dir: `assets/frames/${name}/`, n: FRAMES[name] });
   const PUMPKIN = {
     base:     { image: "assets/pumpkin-base.png", idle: clip("base-idle") },
