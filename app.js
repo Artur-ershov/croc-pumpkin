@@ -47,6 +47,7 @@
   let email = "";
   let current = 0;
   let answers = {};
+  let remoteDone = new Set();
 
   const $ = (s) => document.querySelector(s);
   const stage = $("#stage");
@@ -129,6 +130,7 @@
   const emailField = $("#email-field");
   const emailBtn = $("#btn-email");
   let emailTimer = null;
+  let checkingEmail = false;
 
   function validateEmail(showError) {
     const v = emailInput.value.trim();
@@ -155,17 +157,35 @@
     e.preventDefault();
     if (validateEmail(true)) $("#email-form").requestSubmit();
   });
-  $("#email-form").addEventListener("submit", (e) => {
+  $("#email-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!validateEmail(true)) { emailInput.focus(); return; }
+    if (checkingEmail) return;
     email = emailInput.value.trim().toLowerCase();
     answers = (store[email] && store[email].answers) || {};
+    checkingEmail = true; emailBtn.disabled = true;
+    remoteDone = await fetchRemoteDone(email);
+    checkingEmail = false; emailBtn.disabled = false;
     modal.hidden = true;
     current = firstUndone();
     if (current === -1) { finish(); return; }
     renderGame();
     show("screen-game");
   });
+  // Scenarios this email already answered (possibly in another browser). Only indices come back, never texts.
+  async function fetchRemoteDone(mail) {
+    if (!BACKEND_URL) return new Set();
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(`${BACKEND_URL}?email=${encodeURIComponent(mail)}`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      const data = await res.json();
+      return new Set(data.ok && Array.isArray(data.done) ? data.done : []);
+    } catch {
+      return new Set(); // offline or old script version: fall back to this browser's progress
+    }
+  }
   $("#memo-link").addEventListener("click", (e) => {
     e.preventDefault();
     // TODO: ссылка на памятку по коммуникациям
@@ -184,16 +204,18 @@
   });
 
   function firstUndone() {
-    for (let i = 0; i < SCENARIOS.length; i++) if (!answers[i]) return i;
+    for (let i = 0; i < SCENARIOS.length; i++) if (!isDone(i)) return i;
     return -1;
   }
-  function doneCount() { return SCENARIOS.filter((_, i) => answers[i]).length; }
+  // Done here or, per the sheet, in another browser.
+  function isDone(i) { return !!answers[i] || remoteDone.has(i); }
+  function doneCount() { return SCENARIOS.filter((_, i) => isDone(i)).length; }
 
   function renderGame(popIndex = -1) {
     const s = SCENARIOS[current];
     [...tabs.children].forEach((b, i) => {
       b.classList.toggle("is-active", i === current);
-      b.classList.toggle("is-done", !!answers[i]);
+      b.classList.toggle("is-done", isDone(i));
     });
     // phones: the tab strip scrolls sideways, keep the active tab in view
     const activeTab = tabs.children[current];
@@ -240,7 +262,7 @@
     }
     const btn = $("#btn-feed");
     btn.disabled = true;
-    const wasDone = !!answers[current];
+    const wasDone = isDone(current);
     await feedAnimation(text);
     answers[current] = text;
     save();

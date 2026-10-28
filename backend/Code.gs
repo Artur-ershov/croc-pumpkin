@@ -41,6 +41,19 @@ function doPost(e) {
   }
 }
 
+// GET ?email=… → indices of scenarios this player has answered, so the game resumes in any browser.
+// Answer texts are never returned.
+function doGet(e) {
+  const email = String((e.parameter && e.parameter.email) || "").trim().toLowerCase();
+  if (!/^[a-z0-9._%+-]+@croc\.ru$/.test(email)) return json({ ok: false, error: "bad request" });
+  const people = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PEOPLE_SHEET);
+  if (!people || people.getLastRow() < 2) return json({ ok: true, done: [] });
+  const rows = people.getRange(2, 1, people.getLastRow() - 1, 1 + SCENARIOS.length).getValues();
+  const row = rows.find((r) => String(r[0]).toLowerCase() === email);
+  const done = row ? SCENARIOS.map((_, i) => i).filter((i) => String(row[1 + i]) !== "") : [];
+  return json({ ok: true, done: done });
+}
+
 function sheet(ss, name, header) {
   let sh = ss.getSheetByName(name);
   if (!sh) {
