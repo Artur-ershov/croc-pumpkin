@@ -111,21 +111,136 @@
   }
   addEventListener("resize", layout);
 
+  // ── Film look ───────────────────────────────────────────────────────────────
+  // The visible pumpkin is a canvas redrawn FILM.fps times a second from the clip (or the PNG), so motion
+  // steps like an old cartoon. Boil (edges wobble), shake and flicker change only on those steps.
+  // Strengths are 0..1; the tuner panel (SHOW_TUNER) moves them live and remembers them in this browser.
+  const SHOW_TUNER = true;
+  const FILM_KEY = "croc-pumpkin-film";
+  const FILM_DEFAULTS = { fps: 8, boil: 0.5, shake: 0.5, flicker: 0.5 };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) Object.assign(FILM_DEFAULTS, { boil: 0, shake: 0, flicker: 0 });
+  const FILM = { ...FILM_DEFAULTS };
+  try { Object.assign(FILM, JSON.parse(localStorage.getItem(FILM_KEY) || "{}")); } catch {}
+  function saveFilm() { try { localStorage.setItem(FILM_KEY, JSON.stringify(FILM)); } catch {} }
+  const BOIL_PX = 14;      // displacement at full boil
+  const SHAKE_SHIFT = 0.009; // share of the frame width at full shake
+  const SHAKE_TILT = 1.2;  // degrees at full shake
+  const FLICKER = 0.2;     // brightness swing at full flicker
+  const PAD = 0.03;        // the canvas is 6% bigger than the slot (styles.css), so the shake never crops
+  const KEY_LO = 14, KEY_HI = 30; // clip pixels darker than KEY_LO turn transparent, fading in up to KEY_HI
+  // Three noise fields cycled frame to frame, like hand-drawn lines redrawn for every frame.
+  const boilSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  boilSvg.setAttribute("width", "0"); boilSvg.setAttribute("height", "0"); boilSvg.setAttribute("aria-hidden", "true");
+  boilSvg.style.position = "absolute";
+  boilSvg.innerHTML = [3, 11, 29].map((seed, i) => `<filter id="film-boil${i}" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="${seed}"/><feDisplacementMap in="SourceGraphic" scale="0"/></filter>`).join("");
+  document.body.appendChild(boilSvg);
+  function applyBoil() { boilSvg.querySelectorAll("feDisplacementMap").forEach((m) => m.setAttribute("scale", String(FILM.boil * BOIL_PX))); }
+  applyBoil();
+
+  function filmOf(el) {
+    if (!el._film) {
+      const cv = document.createElement("canvas"), snap = document.createElement("canvas");
+      el.appendChild(cv); el.classList.add("film");
+      el._film = { cv, ctx: cv.getContext("2d"), snap, sctx: snap.getContext("2d"), n: 0, ready: false };
+    }
+    return el._film;
+  }
+  // One frame: take a clean copy of the source (clip if it is playing, else the PNG), then draw it shaken.
+  // While a new clip is still loading the last frame is kept, so clips cut frame to frame.
+  function filmFrame(el) {
+    const f = filmOf(el), img = el.querySelector("img"), video = el.querySelector("video");
+    let src = null, w = 0, h = 0;
+    if (el.classList.contains("has-video")) {
+      if (video.readyState >= 2) { src = video; w = video.videoWidth; h = video.videoHeight; }
+    } else if (img.complete && img.naturalWidth) { src = img; w = img.naturalWidth; h = img.naturalHeight; }
+    if (src) {
+      const sw = 720, sh = Math.round(720 * h / w);
+      if (f.snap.width !== sw || f.snap.height !== sh) { f.snap.width = sw; f.snap.height = sh; }
+      const cw = Math.round(sw * (1 + 2 * PAD)), ch = Math.round(sh * (1 + 2 * PAD));
+      if (f.cv.width !== cw || f.cv.height !== ch) { f.cv.width = cw; f.cv.height = ch; }
+      f.sctx.clearRect(0, 0, sw, sh); f.sctx.drawImage(src, 0, 0, sw, sh); f.ready = true;
+      // The clip's black background becomes transparent, so the stage texture shows through
+      // even where blending is lost (the boil filter breaks mix-blend-mode in some renderers).
+      if (src === video) {
+        const data = f.sctx.getImageData(0, 0, sw, sh), px = data.data;
+        for (let i = 0; i < px.length; i += 4) {
+          const m = Math.max(px[i], px[i + 1], px[i + 2]);
+          if (m < KEY_LO) px[i + 3] = 0;
+          else if (m < KEY_HI) px[i + 3] = (m - KEY_LO) * 255 / (KEY_HI - KEY_LO);
+        }
+        f.sctx.putImageData(data, 0, 0);
+      }
+    }
+    if (!f.ready) return;
+    const { cv, ctx, snap } = f, rnd = (a) => (Math.random() * 2 - 1) * a;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.translate(cv.width / 2 + rnd(FILM.shake * SHAKE_SHIFT * cv.width), cv.height / 2 + rnd(FILM.shake * SHAKE_SHIFT * cv.width));
+    ctx.rotate(rnd(FILM.shake * SHAKE_TILT) * Math.PI / 180);
+    ctx.drawImage(snap, -snap.width / 2, -snap.height / 2);
+    const filters = [];
+    if (FILM.boil > 0) filters.push(`url(#film-boil${f.n++ % 3})`);
+    if (FILM.flicker > 0) filters.push(`brightness(${(1 + rnd(FILM.flicker * FLICKER)).toFixed(3)})`);
+    cv.style.filter = filters.join(" ") || "none";
+  }
+  let filmNext = 0;
+  (function filmLoop(t) {
+    if (t >= filmNext) {
+      const step = 1000 / FILM.fps;
+      filmNext = t - filmNext > step ? t + step : filmNext + step; // keep the rate exact, resync after a stall
+      document.querySelectorAll(".screen.is-active [data-pumpkin]").forEach(filmFrame);
+    }
+    requestAnimationFrame(filmLoop);
+  })(0);
+
+  // ── Tuner panel: live sliders for the film look ─────────────────────────────
+  if (SHOW_TUNER) {
+    const panel = document.createElement("details");
+    panel.className = "tuner";
+    try { panel.open = localStorage.getItem(FILM_KEY + "-open") === "1"; } catch {}
+    panel.addEventListener("toggle", () => { try { localStorage.setItem(FILM_KEY + "-open", panel.open ? "1" : "0"); } catch {} });
+    panel.innerHTML = `<summary>Плёнка</summary><div class="tuner-body"></div>`;
+    const body = panel.querySelector(".tuner-body");
+    const rows = [["fps", "Кадров в секунду", 4, 24], ["boil", "Дрожание контура", 0, 100], ["shake", "Тряска кадра", 0, 100], ["flicker", "Мерцание", 0, 100]];
+    const sync = [];
+    rows.forEach(([key, label, min, max]) => {
+      const row = document.createElement("label");
+      row.className = "tuner-row";
+      row.innerHTML = `<span>${label}</span><b></b><input type="range" id="tuner-${key}" min="${min}" max="${max}" step="1">`;
+      const input = row.querySelector("input"), out = row.querySelector("b");
+      const show = () => {
+        input.value = key === "fps" ? FILM.fps : Math.round(FILM[key] * 100);
+        out.textContent = key === "fps" ? String(FILM.fps) : input.value + "%";
+      };
+      input.addEventListener("input", () => {
+        FILM[key] = key === "fps" ? Number(input.value) : input.value / 100;
+        out.textContent = key === "fps" ? input.value : input.value + "%";
+        if (key === "boil") applyBoil();
+        saveFilm();
+      });
+      show(); sync.push(show); body.appendChild(row);
+    });
+    const reset = document.createElement("button");
+    reset.type = "button"; reset.className = "tuner-reset"; reset.textContent = "Сбросить";
+    reset.addEventListener("click", () => { Object.assign(FILM, FILM_DEFAULTS); applyBoil(); saveFilm(); sync.forEach((s) => s()); });
+    body.appendChild(reset);
+    document.body.appendChild(panel);
+  }
+
   // ── Pumpkin slot ────────────────────────────────────────────────────────────
   function setPumpkin(el, mood, action = "idle") {
     const media = PUMPKIN[mood] || PUMPKIN.base;
     const img = el.querySelector("img");
     const video = el.querySelector("video");
     if (!img.src.endsWith(media.image)) img.src = media.image;
+    // A new mood shows its PNG right away; within one mood the film holds the last frame until the next clip plays.
+    if (el.dataset.mood !== mood) el.classList.remove("has-video");
     el.dataset.mood = mood;
     const src = media[action];
     video.onended = video.onerror = video.onplaying = null;
+    el.classList.remove("idle", "eat", "happy");
     if (src) {
       const toImage = () => { el.classList.remove("has-video"); el.classList.add("idle"); };
-      // The PNG (with its CSS idle) stays up until the clip really plays, so a slow network never leaves the slot empty.
-      el.classList.remove("has-video", "eat", "happy");
-      el.classList.add("idle");
-      video.onplaying = () => { el.classList.add("has-video"); el.classList.remove("idle"); };
+      video.onplaying = () => el.classList.add("has-video");
       video.onerror = toImage;
       if (action === "eat") video.onended = () => setPumpkin(el, mood);
       video.loop = action !== "eat";
@@ -136,7 +251,6 @@
     } else {
       video.pause();
       el.classList.remove("has-video");
-      el.classList.remove("idle", "eat", "happy");
       void el.offsetWidth; // restart CSS animation
       el.classList.add(action);
       if (action !== "idle") el.addEventListener("animationend", () => { el.classList.remove(action); el.classList.add("idle"); }, { once: true });
