@@ -35,6 +35,9 @@
 
   const EMAIL_RE = /^[a-z0-9._%+-]+@croc\.ru$/i;
   const STORE_KEY = "croc-pumpkin-v1";
+  const QUEUE_KEY = "croc-pumpkin-outbox";
+  // Apps Script web app URL (see backend/Code.gs). Empty = answers stay in the browser only.
+  const BACKEND_URL = "";
 
   // ── State ───────────────────────────────────────────────────────────────────
   const params = new URLSearchParams(location.search);
@@ -238,9 +241,38 @@
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   }
 
-  // Stub: in production post to Google Apps Script / form backend (as in "Растопи лёд").
+  // Answers go to a Google Sheet via Apps Script (backend/Code.gs).
+  // Unsent ones wait in localStorage and are retried on the next submit or page load.
   function sendToBackend(payload) {
-    console.log("[pumpkin] answer", payload);
+    const queue = loadQueue();
+    queue.push({ ...payload, ts: new Date().toISOString() });
+    saveQueue(queue);
+    flushQueue();
+  }
+  function loadQueue() {
+    try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; }
+  }
+  function saveQueue(q) {
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch {}
+  }
+  let flushing = false;
+  async function flushQueue() {
+    if (!BACKEND_URL || flushing) return;
+    flushing = true;
+    try {
+      let queue = loadQueue();
+      while (queue.length) {
+        // text/plain keeps it a simple request, so there is no CORS preflight
+        const res = await fetch(BACKEND_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(queue[0]) });
+        if (!res.ok) break;
+        queue = loadQueue().slice(1);
+        saveQueue(queue);
+      }
+    } catch (err) {
+      console.warn("[pumpkin] send failed, will retry", err);
+    } finally {
+      flushing = false;
+    }
   }
 
   // ── 04: final ───────────────────────────────────────────────────────────────
@@ -252,4 +284,5 @@
   // ── Boot ────────────────────────────────────────────────────────────────────
   document.fonts.ready.then(layout);
   layout();
+  flushQueue();
 })();
